@@ -49,52 +49,53 @@ export function stripTaskPrefix(name, taskName) {
 } // line box for the 12px name font in pen.js (FONT_NAME)
 const overlaps = (a, b) => a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
 
-/** The short form of a name gets this fraction of the label width. */
-export const SHORT_FRACTION = 0.4;
-
 /**
- * The short form of a name for tight spots: its last word, which usually tells
- * sessions apart ("…timeouts"), else a middle cut.
+ * The short form of a name for tight spots: its first meaningful whole word
+ * ("Investigate…", "L7…"), or nothing if even that won't fit. Never a fragment.
  */
 export function shortLabel(text, maxWidth, measure) {
-  if (measure(text) <= maxWidth) return text;
-  const words = String(text).trim().split(/\s+/);
-  if (words.length > 1) {
-    const tail = `…${words[words.length - 1]}`;
-    if (measure(tail) <= maxWidth) return tail;
-  }
-  return truncateMiddle(text, maxWidth, measure);
+  const words = String(text).trim().split(/\s+/).filter((w) => /\p{L}/u.test(w)); // a word with a letter: "L7" yes, "#2" no
+  if (words.length < 2) return '';
+  const t = `${words[0]}…`;
+  return measure(t) <= maxWidth ? t : '';
 }
 
 /** How far (in the critter's radii) a label may move from its default spot. */
 export const MAX_SHIFT = 1;
 
-/** A label's default spot: under the feet, or just over the head for bell queuers. */
-export function homeSpot(it) {
-  if (it.above) return { x: it.x, y: it.groundY - it.r * 2 - LABEL_H / 2 - 3 - Math.min(it.headroom || 0, MAX_HEADROOM) };
-  return { x: it.x, y: it.groundY + 10 };
+/** Where a label wants to be: under the feet, and just over the head as the second choice. */
+export function anchorSpots(it) {
+  const below = { x: it.x, y: it.groundY + 10 };
+  const above = { x: it.x, y: it.groundY - it.r * 2 - LABEL_H / 2 - 3 - Math.min(it.headroom || 0, MAX_HEADROOM) };
+  return it.above ? [above, below] : [below, above];
 }
 
+/** A label's default spot: its first anchor. */
+export const homeSpot = (it) => anchorSpots(it)[0];
+
+/** How far a label may move from an anchor: about a body radius, and at least one line. */
+export const shiftLimits = (it) => ({ dx: it.r * MAX_SHIFT, dy: Math.max(it.r * MAX_SHIFT, LABEL_H + 4) });
+
 /**
- * Candidate label centres: the default spot, then small nudges that keep the
- * name within MAX_SHIFT radii of it, so you can always tell whose name it is
- * (a name far from its critter is worse than a faded one).
+ * Candidate label centres: each anchor (under the feet, then over the head),
+ * with small nudges sideways and away from the body, nearest first, so you can
+ * always tell whose name it is. A name far from its critter is worse than none.
  */
 function candidates(it) {
-  const home = homeSpot(it);
-  const d = it.r * MAX_SHIFT;
-  const away = it.above ? -1 : 1; // nudge away from the body, never into it
-  // A small grid of nudges (sideways, and away from the body), nearest first,
-  // keeping only those within d of the default spot.
+  const { dx, dy } = shiftLimits(it);
   const out = [];
-  for (const fy of [0, 0.5, 0.8, 1]) {
-    for (const fx of [0, -0.5, 0.5, -1, 1]) {
-      const o = { x: fx * d, y: away * fy * d };
-      if (Math.hypot(o.x, o.y) <= d + 1e-9) out.push(o);
+  anchorSpots(it).forEach((a, i) => {
+    const away = a.y > it.groundY ? 1 : -1; // never nudge into the body
+    const grid = [];
+    for (const fy of [0, 0.5, 0.8, 1]) {
+      for (const fx of [0, -0.5, 0.5, -1, 1]) {
+        if (Math.hypot(fx, fy) <= 1 + 1e-9) grid.push({ x: fx * dx, y: away * fy * dy, d: Math.hypot(fx, fy) });
+      }
     }
-  }
-
-  return out.map((o) => ({ x: home.x + o.x, y: home.y + o.y }));
+    grid.sort((p, q) => p.d - q.d);
+    for (const o of grid) out.push({ x: a.x + o.x, y: a.y + o.y, anchor: i });
+  });
+  return out;
 }
 
 /**
@@ -102,13 +103,17 @@ function candidates(it) {
  *   `short` is a shorter form of `text` to try before giving up on a clear spot
  * @param {(text: string, item?: object) => number} measure text width in px (item carries e.g. a font)
  * @param {Array<{l:number,r:number,t:number,b:number}>} [blocked] areas labels must avoid
- * @returns {Array<{ id: string, text: string, x: number, y: number, home: {x:number,y:number}, visible: boolean, box: {l:number,r:number,t:number,b:number} }>}
- *   in placement order; a label with no clear spot within MAX_SHIFT stays at `home` with `visible: false`
+ * @param {{l:number,r:number,t:number,b:number}} [bounds] labels must stay inside (the pen)
+ * @returns {Array<{ id: string, text: string, x: number, y: number, home: {x:number,y:number}, visible: boolean, hidden: boolean, box: {l:number,r:number,t:number,b:number} }>}
+ *   in placement order; a label with no clear spot nearby stays at `home` with `visible: false`,
+ *   and `hidden: true` if even a whisper there would cover something
  */
-export function placeLabels(items, measure, blocked = []) {
+export function placeLabels(items, measure, blocked = [], bounds = null) {
+  const inside = (b) => !bounds || (b.l >= bounds.l && b.r <= bounds.r && b.t >= bounds.t && b.b <= bounds.b);
   const rank = (s) => { const i = LABEL_PRIORITY.indexOf(s); return i < 0 ? LABEL_PRIORITY.length : i; };
-  // Same status: parents first (they're the ones you click), then front-most.
-  const order = [...items].sort((a, b) => rank(a.status) - rank(b.status) || (b.parent ? 1 : 0) - (a.parent ? 1 : 0)
+  // Needs-you first, then parents (the ones you click), then by status, then front-most.
+  const tier = (it) => (it.status === 'needs-you' ? 0 : it.parent ? 1 : 2);
+  const order = [...items].sort((a, b) => tier(a) - tier(b) || rank(a.status) - rank(b.status)
     || b.groundY - a.groundY || (a.id < b.id ? -1 : 1));
   // Every critter's body is off limits too, so a name never sits on a neighbour.
   // `body` is where it is drawn this frame (hops included); else it stands on groundY.
@@ -123,19 +128,23 @@ export function placeLabels(items, measure, blocked = []) {
     // Try the full name near its owner, then the short form (if any) near its owner.
     let placed = null;
     for (const text of it.short && it.short !== it.text ? [it.text, it.short] : [it.text]) {
+      if (!text) continue;
       const w = measure(text, it) + 6;
       const boxAt = (p) => ({ l: p.x - w / 2, r: p.x + w / 2, t: p.y - LABEL_H / 2, b: p.y + LABEL_H / 2 });
-      const free = spots.find((p) => !taken.some((o) => overlaps(boxAt(p), o)));
+      const free = spots.find((p) => inside(boxAt(p)) && !taken.some((o) => overlaps(boxAt(p), o)));
       if (free) { placed = { text, at: free, box: boxAt(free) }; break; }
     }
     if (placed) {
       taken.push(placed.box);
-      out.push({ id: it.id, text: placed.text, x: placed.at.x, y: placed.at.y, home: spots[0], visible: true, box: placed.box });
+      out.push({ id: it.id, text: placed.text, x: placed.at.x, y: placed.at.y, home: spots[0], visible: true, hidden: false, box: placed.box });
     } else {
-      // Nowhere close is clear: stay at the default spot, faded (hover restores it).
+      // Nowhere close is clear: at the default spot, whisper it only if that
+      // covers nothing at all; otherwise hide it (hover still shows the name).
       const w = measure(it.text, it) + 6, h = spots[0];
       const box = { l: h.x - w / 2, r: h.x + w / 2, t: h.y - LABEL_H / 2, b: h.y + LABEL_H / 2 };
-      out.push({ id: it.id, text: it.text, x: h.x, y: h.y, home: h, visible: false, box });
+      const ownBody = bodies[items.indexOf(it)];
+      const hidden = !inside(box) || taken.some((o) => o !== ownBody && overlaps(box, o));
+      out.push({ id: it.id, text: it.text, x: h.x, y: h.y, home: h, visible: false, hidden, box });
     }
   }
   return out;

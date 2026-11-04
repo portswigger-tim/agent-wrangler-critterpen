@@ -7,7 +7,7 @@ import { readTheme, toCss, mix, lighten, darken, statusColor } from './color.js'
 import { computeLayout, islandPoint, pickAt, LANDMARK_LABELS } from './layout.js';
 import { createWander, stepWander, wanderPace, separate, bellSlot, islandAxes, PERSONAL_SPACE, DEPTH_WEIGHT } from './wander.js';
 import { drawIsland, drawSignpost, drawMainland, drawBuilding, drawLeash } from './scene.js';
-import { placeLabels, stripTaskPrefix, shortLabel, SHORT_FRACTION } from './labels.js';
+import { placeLabels, stripTaskPrefix, shortLabel } from './labels.js';
 import { diffCritters } from './diff.js';
 import {
   ACCESSORIES, agentTint, kindColor, drawCritter, drawShadow, drawBubble, drawThinkingDots,
@@ -975,7 +975,7 @@ export function createPen(el, opts = {}) {
         ctx.font = font;
         const full = stripTaskPrefix(s.data.name || s.id, s.data.taskName);
         s.label = truncateMiddle(full, labelWidth, (t) => ctx.measureText(t).width);
-        s.labelShort = shortLabel(full, labelWidth * SHORT_FRACTION, (t) => ctx.measureText(t).width);
+        s.labelShort = shortLabel(full, labelWidth, (t) => ctx.measureText(t).width);
         s.labelFor = labelKey;
       }
       if (!layout.compact && hovered !== s.id) {
@@ -989,9 +989,9 @@ export function createPen(el, opts = {}) {
     ctx.font = FONT_NAME;
     const byId = new Map(labels.map((l) => [l.id, l]));
     const measure = (t, it) => { ctx.font = it?.font || FONT_NAME; return ctx.measureText(t).width; };
-    for (const l of placeLabels(labels, measure, labelObstacles())) {
+    for (const l of placeLabels(labels, measure, labelObstacles(), { l: 0, t: 0, r: W, b: H })) {
       const it = byId.get(l.id);
-      haloText(ctx, l.text, l.x, l.y, pal, it.alpha * (l.visible ? 1 : 0.12), it.font);
+      if (!l.hidden) haloText(ctx, l.text, l.x, l.y, pal, it.alpha * (l.visible ? 1 : 0.12), it.font);
     }
 
     // Particles.
