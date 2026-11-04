@@ -38,12 +38,18 @@ export function statusColor(status, pal) {
  * @param {PenOptions & { onCritterClick?: (id: string) => void }} [opts]
  */
 export function createPen(el, opts = {}) {
+  // The canvas sits in its own box and we measure that, not `el`: hosts such
+  // as the wrangler's view slot are `display: contents` and have no size.
+  const wrap = document.createElement('div');
+  wrap.className = 'critter-pen-wrap';
+  wrap.style.cssText = 'position:relative;width:100%;height:100%;min-height:inherit;overflow:hidden;';
   const canvas = document.createElement('canvas');
   canvas.className = 'critter-pen-canvas';
-  canvas.style.cssText = 'display:block;width:100%;height:100%;touch-action:manipulation;';
+  canvas.style.cssText = 'position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:manipulation;';
   canvas.setAttribute('role', 'img');
   canvas.setAttribute('aria-label', 'Critter pen');
-  el.appendChild(canvas);
+  wrap.appendChild(canvas);
+  el.appendChild(wrap);
   const ctx = /** @type {CanvasRenderingContext2D} */ (canvas.getContext('2d'));
 
   let W = 0, H = 0, dpr = 1;
@@ -857,7 +863,7 @@ export function createPen(el, opts = {}) {
   }
 
   function resize() {
-    const rect = el.getBoundingClientRect();
+    const rect = wrap.getBoundingClientRect();
     const nw = Math.max(1, Math.round(rect.width)), nh = Math.max(1, Math.round(rect.height));
     const nd = window.devicePixelRatio || 1;
     if (nw === W && nh === H && nd === dpr) return;
@@ -884,7 +890,7 @@ export function createPen(el, opts = {}) {
   mqReduce.addEventListener?.('change', onReduce);
 
   const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => resize()) : null;
-  ro?.observe(el);
+  ro?.observe(wrap);
   window.addEventListener('resize', resize);
   document.addEventListener('visibilitychange', onVisibility);
 
@@ -940,7 +946,7 @@ export function createPen(el, opts = {}) {
       canvas.removeEventListener('pointermove', onMove);
       canvas.removeEventListener('pointerleave', onLeave);
       canvas.removeEventListener('click', onClick);
-      canvas.remove();
+      wrap.remove();
       sprites.clear();
     },
   };

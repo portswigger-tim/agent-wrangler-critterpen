@@ -5,6 +5,9 @@
 
 export const TOKENS = ['green', 'blue', 'yellow', 'red', 'surface-2', 'fg', 'bg', 'accent'];
 
+/** Fallback variable names (the wrangler's core themes call amber `--warn`). */
+const ALIASES = { yellow: 'warn' };
+
 export const FALLBACKS = {
   light: {
     green: '#3fb950', blue: '#4c8dff', yellow: '#f2b01e', red: '#ef5350',
@@ -139,7 +142,7 @@ function rasterise(css) {
 export function readTheme(el, theme = 'auto') {
   const cs = getComputedStyle(el);
   const raw = {};
-  for (const k of TOKENS) raw[k] = cs.getPropertyValue('--' + k);
+  for (const k of TOKENS) raw[k] = cs.getPropertyValue('--' + k) || cs.getPropertyValue('--' + (ALIASES[k] || k));
   let mode = theme;
   if (mode === 'auto') {
     const bg = raw.bg && (parseColor(raw.bg) || rasterise(raw.bg));
