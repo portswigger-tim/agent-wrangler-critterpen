@@ -28,6 +28,8 @@
 .cp-thinking .cp-dot { background: var(--cp-thinking); }
 .cp-needs-you .cp-dot { background: var(--cp-needs-you); }
 .cp-error .cp-dot { background: var(--cp-error); }
+.cp-finished .cp-dot { background: var(--accent); }
+.cp-asleep { opacity: 0.7; }
 .cp-archived { opacity: 0.4; }
 .cp-hit { animation: cp-hit 0.8s ease-out; }
 @keyframes cp-hit { from { background: color-mix(in srgb, var(--accent) 35%, transparent); } to { background: transparent; } }
