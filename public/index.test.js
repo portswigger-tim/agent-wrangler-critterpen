@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { ICON, parseActivity, penOptions } from './index.js';
+import { ICON, parseActivity, penOptions, finishedStorage } from './index.js';
 
 test('the rail icon is an svg with class="icon", which core sizes on the rail', () => {
   assert.match(ICON, /^<svg class="icon"[\s>]/);
@@ -32,4 +32,21 @@ test('clicking a critter opens that session on the board', () => {
   penOptions({ openSession: (id) => opened.push(id) }).onCritterClick('sess-1');
   assert.deepEqual(opened, ['sess-1']);
   assert.doesNotThrow(() => penOptions(undefined).onCritterClick('x'));
+});
+
+test('clicking a critter marks it seen before opening its session', () => {
+  const calls = [];
+  penOptions({ openSession: (id) => calls.push(['open', id]) }, (id) => calls.push(['seen', id])).onCritterClick('s1');
+  assert.deepEqual(calls, [['seen', 's1'], ['open', 's1']]);
+});
+
+test('finished ids round-trip through the extension\'s own namespaced storage', () => {
+  const kv = new Map();
+  const api = { get: (k) => kv.get(k) ?? null, set: (k, v) => kv.set(k, v) };
+  const store = finishedStorage(api);
+  assert.equal(store.load(), null);
+  store.save(['a', 'b']);
+  assert.deepEqual([...kv.keys()], ['finished']);
+  assert.deepEqual(store.load(), ['a', 'b']);
+  assert.equal(finishedStorage(undefined).load(), null);
 });
