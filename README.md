@@ -3,9 +3,9 @@
 An [Agent Wrangler](https://github.com/portswigger-tim/agent-wrangler) extension that
 shows every session as a small round critter living on floating islands. Each task is
 an island. A critter's colour and antics are its session's status. When a session
-does something, its critter throws something at the matching building on the
-mainland: commit dots at the git tree, a paper plane at the PR mailbox, a ticket at
-the Jira post office.
+does something, its critter throws something at the matching service, a building
+on its own little floating islet: commit dots at the git tree, a paper plane at the
+PR mailbox, a ticket at the Jira post office.
 
 ![Critter Pen in the dark theme](public/engine/docs/pen-dark.png)
 
@@ -15,7 +15,7 @@ the Jira post office.
 | --- | --- |
 | Green, hopping | Working: running tools, a background job (the board's **JOB**), or a running sub-agent or agent-team member |
 | Blue, bobbing with "…" | Thinking: working but quiet for a while, or idle while a session it spawned or nests is still working |
-| Amber, "!", at the bell | Needs you: a permission prompt, a question or an API error |
+| Amber, "!", queued at the "you" islet | Needs you: a permission prompt, a question or an API error |
 | Red, dizzy, smoking | One of its own PRs has failing checks |
 | Lilac, sitting, with a ✓ | Finished a turn you haven't looked at yet. Clicking the critter or opening the session on the board clears it. Remembered per browser, and it never dozes off |
 | Grey, awake and relaxed | Idle at its prompt |
@@ -23,6 +23,14 @@ the Jira post office.
 | Waves and walks off | Archived |
 
 - **Islands:** sessions without a task share a small rocky islet.
+- **Services:** each service (git, PRs, Jira, shell, web, files) has a building on its
+  own islet around the edge, always in roughly the same place (git top-left, PRs top,
+  Jira top-right, shell right, files bottom-right, web bottom-left). The "you" islet
+  sits front and centre; critters that need you hop over and queue outside it.
+- **A steady view:** nothing moves the scene but a resize of the pen. Islands and islets
+  stay exactly where they are as sessions change status, do things, spawn or finish. A
+  new task's island appears in free space; a closed task's island fades where it was
+  and leaves its gap. Only a real click on a critter opens a session.
 - **Personality:** now and then a critter yawns, stretches, looks around, hums or
   chats with an islandmate. Eyes follow your cursor when it's close, siblings wave
   at a newly spawned critter, and a finished critter does a happy wiggle. Each
@@ -43,8 +51,6 @@ the Jira post office.
   or show just their first word ("Investigate…"). A name is never cut to a meaningless
   stub. With no room nearby it fades to a whisper, or is hidden if a whisper would sit
   under another name; hovering always shows it.
-  Critters waiting at the bell show their name above their heads. Hover a critter for
-  its full name.
 - **Personal space:** critters never stand inside each other, strolling or resting.
 - **Click:** clicking a critter opens its session on the board.
 - **Reduced motion:** the pen follows your OS reduced-motion setting live, swapping

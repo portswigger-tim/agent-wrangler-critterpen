@@ -21,12 +21,12 @@ who is stuck, who needs you, and what they are poking at, without reading a card
 | --- | --- | --- |
 | `working` | `--green` | bouncy hop, squash & stretch, little dust puffs; wanders its island briskly |
 | `thinking` (working, no tool for a while; or idle while a child it spawned is working) | `--blue` | slow bob, orbiting "…" dots; ambles slowly |
-| `needs-you` (waiting on human / permission) | `--yellow`/amber | hops to the "you" bell on the mainland and waits there waving, "!" bubble; hops home when done |
+| `needs-you` (waiting on human / permission) | `--yellow`/amber | hops to the "you" islet and queues outside its building, "!" bubble; hops home when done |
 | `error` / failed checks | `--red` | wobble, puff of smoke, dizzy stars; stays put |
 | `finished` (finished a turn, you haven't looked yet) | green-grey | sits, looks out at you, small ✓ bubble |
 | `idle` (awake at its prompt, nothing pending) | `--surface-2` grey-ish | awake and relaxed, eyes wandering, the odd slow stroll |
 | `asleep` (no live terminal, snoozed, or quiet 30+ min) | dimmer grey | sleeps where it stands, "z z z", slow breathing |
-| `archived` | — | waves goodbye, hops down to the mainland and walks off-screen |
+| `archived` | — | waves goodbye and hops off its island, away off-screen |
 
 Each critter: a sphere with two eyes (blink at random), optional tiny hat/accessory
 derived deterministically from the session id so a session is recognisable over time,
@@ -40,10 +40,18 @@ clearly away from status green, so working critters stand out) with a craggy ear
 underside and dangling roots, bobbing gently in the sky. The task name hangs on a
 wooden plank on the island's cliff face. Islands size themselves to their critter count
 (`layout.islandSize`) and are packed across the sky with gaps between them
-(`layout.packIslands`): new islands go to the roomiest free spot, overlaps are relaxed
-apart, and every island remembers its previous spot (`anchors`, normalised to the sky)
-so islands don't jump about as critters come and go or the pen resizes. If they don't
-fit, everything shrinks a little. Sessions with no task get a small **rocky islet**.
+(`layout.packIslands`) around the service islets. If they don't fit, everything shrinks
+a little. Sessions with no task get a small **rocky islet**.
+
+**Events never change the view.** Once placed, every island and islet is pinned:
+`computeLayout` takes the previous layout, and unless the pen was resized (or nothing
+was placed yet) nothing already placed moves, and the critter size stays put. An island
+whose crowd changes grows or shrinks **in place** (centre fixed), its growth stopping at
+its neighbours. A new task's island goes into the roomiest free spot, shrinking if it
+must, without moving anyone. A removed task's island fades out where it is and its
+space stays reserved (a ghost) until the next resize. A resize re-packs from each
+island's previous spot, so the relative arrangement survives. There is no camera, zoom
+or pan, and only a trusted (human) click on a critter calls `onCritterClick`.
 
 Critters **wander** their own island in island-local coordinates (`wander.js`), so a
 critter can never step off it: brisk strolls when working, slow ambles when thinking or
@@ -80,20 +88,24 @@ names readable even in crowds.
 on light, over a contrasting halo) from parent to child, drawn above the islands and
 below the critters with a slight catenary sag, across islands too.
 
-**Landmarks are small buildings on a mainland strip** along the bottom: Git is a tree
-whose fruit are commits, PRs a mailbox (its flag pops up on delivery), Jira a post
-office, Terminal a little forge with a smoking chimney, Web a lattice tower with a
-balloon, Files a shed with paper stacked outside, and the **"you" bell** stands front
-and centre. A critter that needs you hops over and queues by the bell, waving; the bell
-glows softly while anyone waits (no count: another extension shows that). Projectiles:
-git = little commit dots, PR = paper plane, Jira = ticket card, terminal = sparks,
-files = paper scraps, web = tiny balloon. A building squashes and rings when hit.
+**Services live on islets.** Each service is a building on its own little floating
+islet (`buildings.js`, the artist's; the carrier is drawn separately so it can be
+re-skinned). Placement is carrier-independent: `layout.js` gets a footprint function
+(`isletFootprint`) and treats each service as a box with a preferred spot, a fixed
+mental map: git top-left, PRs top, Jira top-right, shell right, files bottom-right, web
+bottom-left, and the **"you" islet** front and centre (`layout.SERVICE_SPOTS`). Islets
+lean toward their spots but may shift away from task islands on a full pack. A critter
+that needs you hops over and queues outside the "you" building
+(`buildings.bellQueueSlots`); the building glows softly while anyone waits (no count:
+another extension shows that). Projectiles arc from the critter to the service's
+building: git = little commit dots, PR = paper plane, Jira = ticket card, terminal =
+sparks, files = paper scraps, web = tiny balloon; the building plays its hit animation.
 
 Below 170px tall (the `board.tray` strip) the pen falls back to a single row of task
 clusters with the buildings shrunk into a strip on the right.
 
 Reduced motion: no bobbing, no wandering, no hops; critters are placed straight onto
-their island spots or the bell queue.
+their island spots or the queue at the "you" islet.
 
 ## Architecture
 
