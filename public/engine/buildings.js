@@ -10,7 +10,7 @@
 // suits a ~18px critter radius. Draw-only, plus pure helpers for layout/tests.
 
 import { TAU, clamp, hash32, rng } from './util.js';
-import { toCss, mix, lighten, darken, parseColor, pastel, inkFor } from './color.js';
+import { toCss, mix, lighten, darken, parseColor, pastel, inkFor, rgbToHsl, hslToRgb } from './color.js';
 import { kindColor, roundRect, ellipse } from './art.js';
 import { naturePalette, drawIsland } from './scene.js';
 import { PLANK_MARKS, drawMark, markVariantFor } from './brand/index.js';
@@ -437,9 +437,14 @@ const BUILDINGS = {
   },
 };
 
-/** The phone box red: the theme's --red, deepened a touch so it reads as a classic box. */
+/**
+ * The phone box red: a warm pillar-box red from the theme's --red. It is 7°
+ * warmer, richer and deeper than the error-status red, so a ringing phone box
+ * never reads as an error. Still softened, just not pastel-light.
+ */
 export function phoneRed(pal) {
-  return mix(pastel(pal.red, !!pal.dark), darken(pal.red, 0.2), 0.5);
+  const { h } = rgbToHsl(pal.red);
+  return hslToRgb((h + 7) % 360, 0.74, pal.dark ? 0.52 : 0.47);
 }
 
 /**
@@ -668,3 +673,6 @@ function drawVines(ctx, cx, cy, rx, ry, n, t, seed) {
   }
   ctx.restore();
 }
+
+// Service keepers live next to the buildings they guard.
+export * from './keepers.js';

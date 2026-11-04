@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Service keepers</title>
+<style>
+  [data-theme="dark"] {
+    --bg: #12151b; --surface-2: #3a414b; --fg: #e6edf3;
+    --green: #56d364; --blue: #6ca7ff; --yellow: #f5c542; --red: #ff6b6b; --accent: #bc8cff;
+  }
+  [data-theme="light"] {
+    --bg: #f4f1ea; --surface-2: #cfd3da; --fg: #23262d;
+    --green: #2fa84f; --blue: #3b7ddd; --yellow: #e9a514; --red: #e5484d; --accent: #8e5bd8;
+  }
+  html, body { margin: 0; height: 100%; font: 13px system-ui, sans-serif; }
+  body { display: grid; grid-template-columns: 1fr 1fr; }
+  .panel { position: relative; background: var(--bg); color: var(--fg); }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<!-- Art reference for the service keepers (keepers.js): each keeper with its
+     building, at rest / about to catch / mid-chomp / full, in both themes.
+     ?live=1 cycles real catches instead · ?t=seconds freezes time · ?scale=0.5 -->
+<div class="panel" data-theme="dark"><canvas></canvas></div>
+<div class="panel" data-theme="light"><canvas></canvas></div>
+<script type="module">
+import { drawServiceBuilding, KEEPER_KINDS, LAND, CATCH, FULL_AT, drawKeeper, keeperMouth, catchProgress } from './buildings.js';
+import { readTheme } from './color.js';
+import { drawProjectile, haloText } from './art.js';
+
+const q = new URLSearchParams(location.search);
+const frozen = q.has('t') ? +q.get('t') : null;
+const live = q.get('live') === '1';
+const S = +(q.get('scale') || 0.5);
+const STAGES = [
+  ['at rest', () => ({})],
+  ['about to catch', () => ({ progress: LAND * 0.85, recent: 1 })],
+  ['chomp', () => ({ progress: LAND + 0.1, recent: 1 })],
+  ['full', () => ({ progress: 0.7, recent: FULL_AT })],
+];
+
+const panels = [...document.querySelectorAll('.panel')].map((el) => ({ el, canvas: el.querySelector('canvas') }));
+
+function frame(ms) {
+  const t = frozen ?? ms / 1000;
+  for (const { el, canvas } of panels) {
+    const ctx = canvas.getContext('2d');
+    const dpr = devicePixelRatio || 1, W = canvas.clientWidth, H = canvas.clientHeight;
+    if (canvas.width !== W * dpr) { canvas.width = W * dpr; canvas.height = H * dpr; }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const pal = readTheme(el, 'auto');
+    const colW = W / KEEPER_KINDS.length, rowH = (H - 20) / STAGES.length;
+    STAGES.forEach(([label, state], row) => {
+      haloText(ctx, label, 44, 24 + row * rowH, pal, 0.55);
+      KEEPER_KINDS.forEach((kind, i) => {
+        const x = colW * (i + 0.5), y = 20 + rowH * (row + 0.86);
+        let cs = state();
+        if (live) {
+          // A catch every 2.6s, staggered; a quick double+triple every so often.
+          const period = 2.6, off = i * 0.4, k = (t + off) % period;
+          const land = t - k + CATCH.lead;
+          cs = { progress: catchProgress(t, land), recent: Math.floor((t + off) / period) % 4 === 3 ? FULL_AT : 1 };
+        }
+        drawServiceBuilding(ctx, kind, x - 6, y, S, pal, t, { shadow: true });
+        drawKeeper(ctx, kind, x - 6, y, S, pal, t, cs);
+        // The snack arriving at the mouth, just before it lands.
+        if (cs.progress != null && cs.progress < LAND) {
+          const m = keeperMouth(kind, S), k = cs.progress / LAND;
+          drawProjectile(ctx, kind, x - 6 + m.dx - (1 - k) * 34, y + m.dy - (1 - k) * 22, 0.6, t, pal, 0.8);
+        }
+      });
+    });
+  }
+  if (frozen == null) requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

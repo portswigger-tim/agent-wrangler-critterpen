@@ -47,6 +47,7 @@ cd public/engine && npm test   # node --test, no dependencies
 | `behaviour.js` | Personality: rare, seeded, deterministic idle behaviours and pose modifiers |
 | `ambient.js` | Sky, fireflies (dark) and petals/motes (light); stateless |
 | `buildings.js` | Service buildings (incl. the "you" phone box and its receiver cord), hit animations, caption planks, kept apart from their carrier (floating islets) |
+| `keepers.js` | Service keepers: small non-critter creatures that catch and eat projectiles at each building (re-exported from `buildings.js`) |
 | `brand/` | Official third-party marks used on caption planks (Git only), with `NOTICE.md` |
 | `scene.js` | Scenery: floating islands, name planks, leashes, the compact tray's small buildings |
 | `layout.js` | Pure layout: island sizing, service islet placement and packing, pinning (events never move anything), size by role, home spots, hit testing, compact tray rows |
@@ -56,7 +57,8 @@ cd public/engine && npm test   # node --test, no dependencies
 | `color.js` | Colour parsing/mixing, HSL, pastel status colours, theme token reading |
 | `util.js` | Hashing, seeded RNG, easing, springs, text truncation |
 
-`buildings.html` does the same for the service buildings (`?hit=0.6`, `?t=2`).
+`buildings.html` does the same for the service buildings (`?hit=0.6`, `?t=2`), and
+`keepers.html` for the keepers at rest, about to catch, mid-chomp and full (`?live=1`).
 
 `sheet.html` is a character sheet: every status face and personality behaviour
 drawn large (`?theme=light`, `?t=3` to freeze time, `?r=60` for size). Use it
