@@ -37,9 +37,12 @@ the Jira post office.
   plank already shows ("Safer-runner-action L7 mitmproxy" on the Safer Runner island
   reads "L7 mitmproxy"), and long names lose whole words from the middle so the first
   and last survive ("Investigate … timeouts"). Names never sit on another critter, and
-  when critters crowd together the names never overlap: the critters that need you
-  keep theirs in place (parents first among equals, in bolder type), others shift
-  aside or above their heads, and a name with no room left fades to a whisper.
+  when critters crowd together the names never overlap. A name always stays with its
+  critter: the critters that need you keep theirs in place (parents first among
+  equals, in bolder type), others nudge a little, move just above their critter's head,
+  or show just their first word ("Investigate…"). A name is never cut to a meaningless
+  stub. With no room nearby it fades to a whisper, or is hidden if a whisper would sit
+  under another name; hovering always shows it.
   Critters waiting at the bell show their name above their heads. Hover a critter for
   its full name.
 - **Personal space:** critters never stand inside each other, strolling or resting.
@@ -50,6 +53,10 @@ the Jira post office.
 - **Themes:** colours come from the board theme, so every Agent Wrangler theme works.
 
 Critter Pen deliberately shows no "needs you" counts or badges.
+
+Critter Pen never navigates or changes your view on its own: nothing it sees (a
+finished turn, a session needing you, new activity) opens, selects or scrolls to
+anything. Only clicking a critter opens its session.
 
 ## Install
 

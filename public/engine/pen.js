@@ -7,7 +7,7 @@ import { readTheme, toCss, mix, lighten, darken, statusColor } from './color.js'
 import { computeLayout, islandPoint, pickAt, LANDMARK_LABELS } from './layout.js';
 import { createWander, stepWander, wanderPace, separate, bellSlot, islandAxes, PERSONAL_SPACE, DEPTH_WEIGHT } from './wander.js';
 import { drawIsland, drawSignpost, drawMainland, drawBuilding, drawLeash } from './scene.js';
-import { placeLabels, stripTaskPrefix } from './labels.js';
+import { placeLabels, stripTaskPrefix, shortLabel } from './labels.js';
 import { diffCritters } from './diff.js';
 import {
   ACCESSORIES, agentTint, kindColor, drawCritter, drawShadow, drawBubble, drawThinkingDots,
@@ -973,12 +973,14 @@ export function createPen(el, opts = {}) {
         // The island plank already names the task; keep the part that tells
         // sessions apart, cutting from the middle if it still doesn't fit.
         ctx.font = font;
-        s.label = truncateMiddle(stripTaskPrefix(s.data.name || s.id, s.data.taskName), labelWidth, (t) => ctx.measureText(t).width);
+        const full = stripTaskPrefix(s.data.name || s.id, s.data.taskName);
+        s.label = truncateMiddle(full, labelWidth, (t) => ctx.measureText(t).width);
+        s.labelShort = shortLabel(full, labelWidth, (t) => ctx.measureText(t).width);
         s.labelFor = labelKey;
       }
       if (!layout.compact && hovered !== s.id) {
         const near = hoverSprite && Math.abs(hoverSprite.y.x - groundY) < 30 && Math.abs(hoverSprite.x.x - s.x.x) < labelWidth * 1.5;
-        labels.push({ id: s.id, text: s.label, x: s.x.x, groundY, r, status: s.status, above: s.place === 'bell', parent: s.role === 'parent', font, body: { cx: s.cx, cy: s.cy, cr: s.cr }, headroom: headroomOf(s, r), alpha: (s.status === 'asleep' ? 0.6 : 0.85) * a * (near ? 0.2 : 1) });
+        labels.push({ id: s.id, text: s.label, short: s.labelShort, x: s.x.x, groundY, r, status: s.status, above: s.place === 'bell', parent: s.role === 'parent', font, body: { cx: s.cx, cy: s.cy, cr: s.cr }, headroom: headroomOf(s, r), alpha: (s.status === 'asleep' ? 0.6 : 0.85) * a * (near ? 0.2 : 1) });
       }
     }
 
@@ -987,9 +989,9 @@ export function createPen(el, opts = {}) {
     ctx.font = FONT_NAME;
     const byId = new Map(labels.map((l) => [l.id, l]));
     const measure = (t, it) => { ctx.font = it?.font || FONT_NAME; return ctx.measureText(t).width; };
-    for (const l of placeLabels(labels, measure, labelObstacles())) {
+    for (const l of placeLabels(labels, measure, labelObstacles(), { l: 0, t: 0, r: W, b: H })) {
       const it = byId.get(l.id);
-      haloText(ctx, l.text, l.x, l.y, pal, it.alpha * (l.visible ? 1 : 0.12), it.font);
+      if (!l.hidden) haloText(ctx, l.text, l.x, l.y, pal, it.alpha * (l.visible ? 1 : 0.12), it.font);
     }
 
     // Particles.

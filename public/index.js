@@ -60,65 +60,76 @@ export function parseActivity(msg) {
     .map((e) => (e.label ? { critterId: e.sessionId, kind: e.kind, label: e.label } : { critterId: e.sessionId, kind: e.kind }));
 }
 
-export default {
-  register(slots) {
-    const pens = new Map(); // view element -> { pen, adapter, api, statuses, graph, critters, timer, observer }
+// Critter Pen never changes the human's view on its own. Nothing here (a
+// graph tick, an activity frame, a status change, a timer) may navigate,
+// select, focus or scroll; the only call that moves the board is openSession,
+// and it is made only from the engine's onCritterClick, i.e. a human click on
+// a critter. The selection is only ever READ (to notice the human has looked
+// at a finished card). index.test.js holds this as an invariant.
+//
+// `loadRenderer` and `createFallbackPen` are the engine and the placeholder;
+// they are parameters only so that invariant can be tested without a DOM.
+export function registerCritters(slots, { loadRenderer = loadEngine, createFallbackPen = createPlaceholderPen } = {}) {
+  const pens = new Map(); // view element -> { pen, adapter, api, statuses, graph, critters, timer, observer }
 
-    const render = (st, graph) => {
-      if (graph) st.graph = graph;
-      if (!st.graph) return;
-      const { state, events } = st.adapter.tick(st.graph, Date.now(), { selectedId: st.api?.selectedSessionId?.() ?? null });
-      st.critters = new Set(state.critters.map((c) => c.id));
-      st.pen.setState(forEngine(state, st.statuses));
-      for (const ev of events) st.pen.emit(ev);
-    };
+  const render = (st, graph) => {
+    if (graph) st.graph = graph;
+    if (!st.graph) return;
+    const { state, events } = st.adapter.tick(st.graph, Date.now(), { selectedId: st.api?.selectedSessionId?.() ?? null });
+    st.critters = new Set(state.critters.map((c) => c.id));
+    st.pen.setState(forEngine(state, st.statuses));
+    for (const ev of events) st.pen.emit(ev);
+  };
 
-    slots.api.onMessage((msg) => {
-      const events = parseActivity(msg);
-      if (!events.length) return;
-      for (const st of pens.values()) {
-        for (const ev of events) if (st.critters.has(ev.critterId)) st.pen.emit(ev);
+  slots.api.onMessage((msg) => {
+    const events = parseActivity(msg);
+    if (!events.length) return;
+    for (const st of pens.values()) {
+      for (const ev of events) if (st.critters.has(ev.critterId)) st.pen.emit(ev);
+    }
+  });
+
+  slots.register('view', {
+    id: 'critters',
+    label: 'Critters',
+    icon: ICON,
+    mount(el, api) {
+      el.classList.add('critter-pen');
+      const adapter = createAdapter({ storage: finishedStorage(api?.storage) });
+      const opts = penOptions(api, (id) => adapter.acknowledge(id));
+      const st = { pen: createFallbackPen(el, opts), adapter, api, statuses: null, graph: null, critters: new Set(), timer: null, observer: null };
+      pens.set(el, st);
+      st.timer = setInterval(() => render(st), RETICK_MS);
+      if (typeof ResizeObserver === 'function') {
+        st.observer = new ResizeObserver(() => st.pen.resize());
+        st.observer.observe(el);
       }
-    });
-
-    slots.register('view', {
-      id: 'critters',
-      label: 'Critters',
-      icon: ICON,
-      mount(el, api) {
-        el.classList.add('critter-pen');
-        const adapter = createAdapter({ storage: finishedStorage(api?.storage) });
-        const opts = penOptions(api, (id) => adapter.acknowledge(id));
-        const st = { pen: createPlaceholderPen(el, opts), adapter, api, statuses: null, graph: null, critters: new Set(), timer: null, observer: null };
-        pens.set(el, st);
-        st.timer = setInterval(() => render(st), RETICK_MS);
-        if (typeof ResizeObserver === 'function') {
-          st.observer = new ResizeObserver(() => st.pen.resize());
-          st.observer.observe(el);
-        }
-        loadEngine().then((engine) => {
-          if (!engine || pens.get(el) !== st) return;
-          st.pen.destroy();
-          st.pen = engine.createPen(el, opts);
-          st.statuses = engine.statuses;
-          // A fresh renderer has seen nothing: give it the current state, without
-          // replaying events it would draw as new.
-          st.adapter.reset();
-          render(st);
-        });
-      },
-      update(el, _session, graph) {
-        const st = pens.get(el);
-        if (st) render(st, graph);
-      },
-      unmount(el) {
-        const st = pens.get(el);
-        if (!st) return;
-        pens.delete(el);
-        clearInterval(st.timer);
-        st.observer?.disconnect();
+      loadRenderer().then((engine) => {
+        if (!engine || pens.get(el) !== st) return;
         st.pen.destroy();
-      },
-    });
-  },
+        st.pen = engine.createPen(el, opts);
+        st.statuses = engine.statuses;
+        // A fresh renderer has seen nothing: give it the current state, without
+        // replaying events it would draw as new.
+        st.adapter.reset();
+        render(st);
+      });
+    },
+    update(el, _session, graph) {
+      const st = pens.get(el);
+      if (st) render(st, graph);
+    },
+    unmount(el) {
+      const st = pens.get(el);
+      if (!st) return;
+      pens.delete(el);
+      clearInterval(st.timer);
+      st.observer?.disconnect();
+      st.pen.destroy();
+    },
+  });
+}
+
+export default {
+  register(slots) { registerCritters(slots); },
 };
