@@ -1,5 +1,5 @@
 // Service buildings: the landmark each service lives in (git tree, PR mailbox,
-// Jira post office, shell forge, web balloon tower, files shed, the "you" bell),
+// Jira post office, shell forge, web balloon tower, files shed, the "you" phone box),
 // drawn larger and with charm, plus a hit animation and a plank caption.
 //
 // The building is kept apart from whatever carries it, so the carrier can be
@@ -12,7 +12,8 @@
 import { TAU, clamp, hash32, rng } from './util.js';
 import { toCss, mix, lighten, darken, parseColor, pastel, inkFor } from './color.js';
 import { kindColor, roundRect, ellipse } from './art.js';
-import { naturePalette, drawIsland, drawSignpost } from './scene.js';
+import { naturePalette, drawIsland } from './scene.js';
+import { PLANK_MARKS, drawMark, markVariantFor } from './brand/index.js';
 
 export const ISLET_KINDS = ['git', 'pr', 'jira', 'terminal', 'web', 'files', 'human'];
 
@@ -23,7 +24,7 @@ const WIDTH = { git: 48, pr: 40, jira: 48, terminal: 40, web: 30, files: 46, hum
 
 /**
  * Size of a building alone, in px at `scale`, around its base point: `w` wide
- * (centred), `top` tall (balloon, smoke and bell roof included). Carrier-free.
+ * (centred), `top` tall (balloon, smoke and phone-box roof included). Carrier-free.
  */
 export function buildingFootprint(kind, scale = 1) {
   return { w: (WIDTH[kind] || 44) * UNIT * scale, top: ((HEIGHT[kind] || 44) * UNIT + 12) * scale };
@@ -77,14 +78,15 @@ export function hitPose(hit) {
 }
 
 /**
- * Queue spots around the bell, relative to its base point: two staggered rows a
- * side, nearest the bell first, alternating right and left. Spots for a
- * critter of radius `critterR` never overlap each other or the bell.
+ * Queue spots around the phone box (kind 'human'), relative to its base point: two staggered rows a
+ * side, nearest the box first, alternating right and left. Spots for a
+ * critter of radius `critterR` never overlap each other or the box. Slot
+ * PHONE_HOLDER_SLOT (the front) holds the receiver.
  */
 export function bellQueueSlots(scale = 1, critterR = 18, n = 8) {
   const out = [];
   const gap = critterR * 2.1;
-  const bellClear = (WIDTH.human / 2) * UNIT * scale + critterR * 1.05; // half the bell frame + a body
+  const bellClear = (WIDTH.human / 2) * UNIT * scale + critterR * 1.05; // room for the box + a body (and the cord)
   for (let i = 0; i < n; i++) {
     const side = i % 2 ? -1 : 1, k = Math.floor(i / 2);   // k-th spot on this side
     const col = Math.floor(k / 2), row = k % 2;          // two per column, staggered back/front
@@ -98,7 +100,7 @@ const WHITE = C('#ffffff');
 const WARM = C('#ffd27a');
 
 /** Window/opening that glows warmly in dark themes, and flashes on a hit. */
-function windowPane(ctx, x, y, w, h, u, pal, n, flash = 0, round = 1.2) {
+function windowPane(ctx, x, y, w, h, u, pal, n, flash = 0, round = 1.2, cross = true) {
   const glow = pal.dark ? 0.75 : 0;
   const lit = Math.max(glow, flash);
   roundRect(ctx, x, y, w, h, round * u);
@@ -118,7 +120,7 @@ function windowPane(ctx, x, y, w, h, u, pal, n, flash = 0, round = 1.2) {
   ctx.lineWidth = 0.8 * u;
   roundRect(ctx, x, y, w, h, round * u);
   ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x + w / 2, y); ctx.lineTo(x + w / 2, y + h); ctx.moveTo(x, y + h / 2); ctx.lineTo(x + w, y + h / 2); ctx.stroke();
+  if (cross) { ctx.beginPath(); ctx.moveTo(x + w / 2, y); ctx.lineTo(x + w / 2, y + h); ctx.moveTo(x, y + h / 2); ctx.lineTo(x + w, y + h / 2); ctx.stroke(); }
 }
 
 const leaf = (ctx, x, y, s, rot) => { ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ellipse(ctx, 0, 0, s, s * 0.5); ctx.fill(); ctx.restore(); };
@@ -377,55 +379,155 @@ const BUILDINGS = {
     }
   },
 
-  human(ctx, u, n, col, hp, t, pal, waiting) { // the bell you get rung with
-    ctx.fillStyle = toCss(n.woodDark);
-    roundRect(ctx, -15 * u, -38 * u, 4 * u, 38 * u, 1 * u); ctx.fill();
-    roundRect(ctx, 11 * u, -38 * u, 4 * u, 38 * u, 1 * u); ctx.fill();
-    ctx.fillStyle = toCss(n.wood);
-    roundRect(ctx, -18 * u, -42 * u, 36 * u, 5 * u, 2 * u); ctx.fill();
-    ctx.fillStyle = toCss(darken(n.wood, 0.2));
-    ctx.beginPath(); ctx.moveTo(-21 * u, -41 * u); ctx.lineTo(0, -50 * u); ctx.lineTo(21 * u, -41 * u); ctx.closePath(); ctx.fill();
-    // Lanterns on the posts: glow at night, brighter while someone waits.
-    for (const sx of [-13, 13]) {
-      const lit = pal.dark ? 0.6 + 0.4 * waiting : 0.25 * waiting;
-      ctx.fillStyle = toCss(mix(n.ink, WARM, Math.max(0.25, lit)));
-      roundRect(ctx, (sx - 2.5) * u, -30 * u, 5 * u, 6 * u, 1.5 * u); ctx.fill();
-      if (lit > 0.05) {
-        const lg = ctx.createRadialGradient(sx * u, -27 * u, 0, sx * u, -27 * u, 9 * u);
-        lg.addColorStop(0, toCss(WARM, 0.4 * lit)); lg.addColorStop(1, toCss(WARM, 0));
-        ctx.fillStyle = lg; ellipse(ctx, sx * u, -27 * u, 9 * u, 9 * u); ctx.fill();
-      }
-    }
-    // The bell swings on a hit, with little ring arcs.
-    const swing = hp.shake * 0.45;
+  human(ctx, u, n, col, hp, t, pal, waiting) { // a little red phone box that rings while anyone waits
+    const red = phoneRed(pal), edge = inkFor(red, 0.45), lightRed = lighten(red, 0.18);
+    const ring = waiting > 0.01 ? phoneRinging(t) : 0;
+    // Wobble: a quick shiver while ringing, a bigger one on a hit (t is 0 under reduced motion).
+    const wob = Math.sin(t * 55) * 0.03 * ring * waiting + hp.shake * 0.07;
     ctx.save();
-    ctx.translate(0, -37 * u);
-    ctx.rotate(swing);
-    const gold = n.gold;
+    ctx.rotate(wob);
+    // Plinth.
+    ctx.fillStyle = toCss(darken(red, 0.3));
+    roundRect(ctx, -13 * u, -3 * u, 26 * u, 3 * u, 0.8 * u); ctx.fill();
+    // Body with corner pilasters.
+    ctx.lineWidth = 1.2 * u;
+    const bg = ctx.createLinearGradient(-11 * u, 0, 11 * u, 0);
+    bg.addColorStop(0, toCss(lightRed)); bg.addColorStop(1, toCss(red));
+    ctx.fillStyle = bg; ctx.strokeStyle = toCss(edge);
+    roundRect(ctx, -11 * u, -40 * u, 22 * u, 37 * u, 1 * u); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = toCss(darken(red, 0.12));
+    ctx.fillRect(-11 * u, -40 * u, 2.5 * u, 37 * u); ctx.fillRect(8.5 * u, -40 * u, 2.5 * u, 37 * u);
+    // Domed roof with a little crest.
     ctx.beginPath();
-    ctx.moveTo(-10 * u, 16 * u);
-    ctx.quadraticCurveTo(-8 * u, 14 * u, -8 * u, 7 * u);
-    ctx.bezierCurveTo(-8 * u, -1 * u, 8 * u, -1 * u, 8 * u, 7 * u);
-    ctx.quadraticCurveTo(8 * u, 14 * u, 10 * u, 16 * u);
+    ctx.moveTo(-12.5 * u, -40 * u);
+    ctx.quadraticCurveTo(-12 * u, -47 * u, 0, -47.5 * u);
+    ctx.quadraticCurveTo(12 * u, -47 * u, 12.5 * u, -40 * u);
     ctx.closePath();
-    const bg = ctx.createLinearGradient(-8 * u, 0, 8 * u, 0);
-    bg.addColorStop(0, toCss(lighten(gold, 0.35))); bg.addColorStop(1, toCss(gold));
-    ctx.fillStyle = bg; ctx.fill();
-    ctx.strokeStyle = toCss(darken(gold, 0.35)); ctx.lineWidth = 1.2 * u; ctx.stroke();
-    ctx.fillStyle = toCss(darken(gold, 0.4));
-    ellipse(ctx, 0, 17.5 * u, 2.2 * u, 2.2 * u); ctx.fill();
-    ctx.fillStyle = toCss(WHITE, 0.55);
-    ellipse(ctx, -3.5 * u, 5 * u, 1.5 * u, 3.4 * u); ctx.fill();
-    ctx.restore();
-    if (hp.h > 0.05) {
-      ctx.strokeStyle = toCss(gold, hp.h);
-      ctx.lineWidth = 1.4 * u;
-      for (const s of [-1, 1]) for (const k of [0, 1]) {
-        ctx.beginPath(); ctx.arc(s * (13 + k * 4) * u, -28 * u, (3 + k * 3) * u, s > 0 ? -0.7 : Math.PI - 0.7, s > 0 ? 0.7 : Math.PI + 0.7); ctx.stroke();
+    ctx.fillStyle = toCss(lightRed); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = toCss(red);
+    ellipse(ctx, 0, -48 * u, 2 * u, 1.4 * u); ctx.fill(); ctx.stroke();
+    // Sign panel with a handset glyph: lit at night, brighter while ringing.
+    const signLit = Math.max(pal.dark ? 0.8 : 0, ring * waiting * 0.6, hp.flash);
+    roundRect(ctx, -7.5 * u, -39 * u, 15 * u, 4.6 * u, 1 * u);
+    ctx.fillStyle = toCss(mix(C('#fbf6e9'), WARM, signLit * 0.6)); ctx.fill();
+    ctx.lineWidth = 0.7 * u; ctx.stroke();
+    drawHandset(ctx, 0, -36.7 * u, u * 0.55, darken(red, 0.35), 0);
+    // Door: a grid of glass panes, warm-lit inside at night.
+    for (let row = 0; row < 4; row++) {
+      for (let c = 0; c < 3; c++) {
+        windowPane(ctx, (-7.2 + c * 5) * u, (-32 + row * 6.6) * u, 4.4 * u, 5.6 * u, u, pal, n, Math.max(hp.flash, ring * waiting * 0.35), 0.5, false);
       }
     }
+    ctx.fillStyle = toCss(n.gold);
+    roundRect(ctx, 6.6 * u, -19 * u, 1 * u, 4 * u, 0.4 * u); ctx.fill();
+    ctx.restore();
+    // Ring arcs beside the sign while ringing (shown still under reduced motion), and a
+    // burst of bigger rings on a hit.
+    const arcs = (k, a) => {
+      ctx.strokeStyle = toCss(lighten(red, 0.35), a);
+      ctx.lineWidth = 1.5 * u;
+      for (const s of [-1, 1]) {
+        ctx.beginPath();
+        ctx.arc(s * (14 + k * 4) * u, -38 * u, (3 + k * 3) * u, s > 0 ? -0.75 : Math.PI - 0.75, s > 0 ? 0.75 : Math.PI + 0.75);
+        ctx.stroke();
+      }
+    };
+    if (waiting > 0.01 && ring > 0.01) { arcs(0, ring * waiting); arcs(1, 0.6 * ring * waiting); }
+    if (hp.h > 0.02) for (let k = 0; k < 3; k++) arcs(k + hp.p * 3, hp.h * (1 - k * 0.25));
   },
 };
+
+/** The phone box red: the theme's --red, deepened a touch so it reads as a classic box. */
+export function phoneRed(pal) {
+  return mix(pastel(pal.red, !!pal.dark), darken(pal.red, 0.2), 0.5);
+}
+
+/**
+ * Double-ring cadence (ring-ring … pause), 0..1 with soft edges. A phone box
+ * rings this way while anyone waits. Pure.
+ */
+export function phoneRinging(t) {
+  const q = ((t % 3) + 3) % 3;
+  const burst = (a, b) => (q >= a && q < b ? Math.min(1, (q - a) / 0.05, (b - q) / 0.05) : 0);
+  return Math.max(burst(0, 0.4), burst(0.6, 1.0));
+}
+
+/** Index in bellQueueSlots() of the critter that holds the receiver: the front of the queue. */
+export const PHONE_HOLDER_SLOT = 0;
+
+/**
+ * Where the cord leaves the box, relative to the building's base point (the
+ * door side, which faces the holder in slot 0).
+ */
+export function phoneSocket(scale = 1) {
+  return { dx: 11 * UNIT * scale, dy: -22 * UNIT * scale };
+}
+
+/**
+ * Where the holder's receiver sits, relative to that critter's ground point:
+ * at its cheek on the side facing the box (`side` is the slot's side, so the
+ * box is at −side).
+ */
+export function receiverSpot(critterR, side = 1) {
+  return { dx: -side * critterR * 0.78, dy: -critterR * 1.15 };
+}
+
+/** A classic handset shape centred on (x, y), `s` px per unit, rotated `rot`. */
+function drawHandset(ctx, x, y, s, color, rot) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  ctx.fillStyle = toCss(color);
+  ctx.beginPath();
+  ctx.moveTo(-6 * s, -1.6 * s);
+  ctx.quadraticCurveTo(0, -3.4 * s, 6 * s, -1.6 * s);
+  ctx.lineTo(6.5 * s, 1.8 * s); ctx.lineTo(3.5 * s, 2 * s); ctx.lineTo(3.5 * s, 0);
+  ctx.quadraticCurveTo(0, -1 * s, -3.5 * s, 0);
+  ctx.lineTo(-3.5 * s, 2 * s); ctx.lineTo(-6.5 * s, 1.8 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * The receiver held by the front critter, with a curly cord back to the box.
+ * Draw it after the critter so the receiver sits at its cheek.
+ * @param {number} sx socket x (building base + phoneSocket().dx; mirror dx if the holder stands on the left)
+ * @param {number} sy socket y
+ * @param {number} hx receiver centre (critter ground point + receiverSpot())
+ * @param {number} hy
+ * @param {number} scale building scale
+ * @param {object} pal
+ * @param {number} t seconds (0 under reduced motion: the cord holds still)
+ */
+export function drawPhoneReceiver(ctx, sx, sy, hx, hy, scale, pal, t = 0) {
+  const u = UNIT * scale;
+  const ink = darken(phoneRed(pal), 0.55);
+  // Curly cord: loops along a sagging curve from socket to receiver.
+  const len = Math.hypot(hx - sx, hy - sy) || 1;
+  const nx = -(hy - sy) / len, ny = (hx - sx) / len;
+  const loops = Math.max(4, Math.round(len / (3.2 * u)));
+  const amp = 1.5 * u, sag = Math.min(len * 0.35, 14 * u);
+  ctx.save();
+  ctx.strokeStyle = toCss(ink, 0.95);
+  ctx.lineWidth = Math.max(0.8, 0.75 * u);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  const N = loops * 10;
+  for (let i = 0; i <= N; i++) {
+    const s = i / N, a = s * loops * TAU + Math.sin(t * 2) * 0.3;
+    const px = sx + (hx - sx) * s + nx * Math.sin(a) * amp + ((hx - sx) / len) * Math.cos(a) * amp * 0.6;
+    const py = sy + (hy - sy) * s + Math.sin(Math.PI * s) * sag + ny * Math.sin(a) * amp + ((hy - sy) / len) * Math.cos(a) * amp * 0.6;
+    i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+  }
+  ctx.stroke();
+  // The receiver, upright against the cheek (earpiece up, mouthpiece down).
+  drawHandset(ctx, hx, hy, 0.95 * u, ink, Math.PI / 2 * (hx < sx ? 1 : -1));
+  ctx.restore();
+}
+
+/** Same spots as bellQueueSlots(): the queue outside the phone box. */
+export const phoneQueueSlots = (...a) => bellQueueSlots(...a);
 
 /** Accent colour for a building: the theme's kind colour, softened like the critters. */
 export function buildingColor(kind, pal) {
@@ -442,7 +544,7 @@ export function buildingColor(kind, pal) {
  * @param {object} pal palette from readTheme()
  * @param {number} t seconds
  * @param {{ hit?: number, waiting?: number, reduced?: boolean, alpha?: number, shadow?: boolean }} [o]
- *   hit 1→0 after an impact; waiting 0..1 how much the bell glows (anyone queued)
+ *   hit 1→0 after an impact; waiting 0..1 while anyone queues at the phone box (it glows and rings)
  */
 export function drawServiceBuilding(ctx, kind, x, y, scale, pal, t, o = {}) {
   const { hit = 0, waiting = 0, reduced = false, alpha = 1, shadow = true } = o;
@@ -452,7 +554,7 @@ export function drawServiceBuilding(ctx, kind, x, y, scale, pal, t, o = {}) {
   const hp = hitPose(reduced ? 0 : hit);
   ctx.save();
   ctx.globalAlpha *= alpha;
-  // The bell's waiting glow: soft, slow, no count.
+  // The phone box's waiting glow: soft, slow, no count.
   if (kind === 'human' && waiting > 0.01) {
     const pulse = reduced ? 1 : 0.8 + 0.2 * Math.sin(t * 2.4);
     const R = 64 * u;
@@ -476,9 +578,44 @@ export function drawServiceBuilding(ctx, kind, x, y, scale, pal, t, o = {}) {
   ctx.restore();
 }
 
-/** The building's caption: a small wooden plank hung from (x, y), like the task-island signs. */
-export function drawCaptionPlank(ctx, x, y, text, pal, scale = 1) {
-  drawSignpost(ctx, x, y, text, pal, { scale: clamp(scale, 0.8, 1.2), hang: true });
+/**
+ * The building's caption: a small wooden plank hung on two ropes from (x, y),
+ * in the same style as the task-island signs. For a kind with an official
+ * brand mark (see brand/), the mark sits small and unaltered left of the text.
+ */
+export function drawCaptionPlank(ctx, x, y, text, pal, scale = 1, { kind } = {}) {
+  if (!text) return;
+  const n = naturePalette(pal);
+  const mark = kind ? PLANK_MARKS[kind] : null;
+  const MARK = 11, PAD = 7;
+  ctx.save();
+  ctx.translate(x, y);
+  const k = clamp(scale, 0.8, 1.2);
+  ctx.scale(k, k);
+  ctx.font = '700 10px system-ui, -apple-system, Segoe UI, sans-serif';
+  const extra = mark ? MARK + 4 : 0;
+  const w = Math.min(150, ctx.measureText(text).width + PAD * 2 + extra);
+  ctx.strokeStyle = toCss(n.woodDark);
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-w / 2 + 8, -12); ctx.lineTo(-w / 2 + 6, 1);
+  ctx.moveTo(w / 2 - 8, -12); ctx.lineTo(w / 2 - 6, 1);
+  ctx.stroke();
+  roundRect(ctx, -w / 2, 0, w, 17, 4);
+  ctx.fillStyle = toCss(n.wood);
+  ctx.fill();
+  ctx.strokeStyle = toCss(n.woodDark);
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  if (mark) drawMark(ctx, mark, -w / 2 + PAD + MARK / 2 - 1, 8.5, MARK, markVariantFor(mark, n.wood));
+  ctx.fillStyle = toCss(n.ink);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const room = w - PAD * 2 - extra + 4;
+  let t = text;
+  while (t.length > 1 && ctx.measureText(t).width > room) t = t.slice(0, -2) + '…';
+  ctx.fillText(t, extra / 2, 9);
+  ctx.restore();
 }
 
 /**
@@ -504,7 +641,7 @@ export function drawCarrier(ctx, carrier, kind, x, y, scale, pal, t, { reduced =
 export function drawIslet(ctx, kind, x, y, scale, pal, t, o = {}) {
   const base = drawCarrier(ctx, 'islet', kind, x, y, scale, pal, t, o);
   drawServiceBuilding(ctx, kind, base.x, base.y, scale, pal, t, o);
-  if (o.caption) drawCaptionPlank(ctx, x, base.captionY, o.caption, pal, scale);
+  if (o.caption) drawCaptionPlank(ctx, x, base.captionY, o.caption, pal, scale, { kind });
 }
 
 /** One or two leafy vines hanging from the islet's front lip, swaying gently. */
