@@ -49,9 +49,9 @@ cd public/engine && npm test   # node --test, no dependencies
 | `buildings.js` | Service buildings (incl. the "you" phone box and its receiver cord), hit animations, caption planks, kept apart from their carrier (floating islets) |
 | `keepers.js` | Service keepers: small non-critter creatures that catch and eat projectiles at each building (re-exported from `buildings.js`) |
 | `brand/` | Official third-party marks used on caption planks (Git only), with `NOTICE.md` |
-| `scene.js` | Scenery: floating islands, name planks, the mainland and its buildings |
-| `layout.js` | Pure layout: island sizing and packing, size by role, home spots, hit testing, landmark positions, compact tray rows |
-| `wander.js` | Pure movement: wandering an island, personal space, the bell queue |
+| `scene.js` | Scenery: floating islands, name planks, leashes, the compact tray's small buildings |
+| `layout.js` | Pure layout: island sizing, service islet placement and packing, pinning (events never move anything), size by role, home spots, hit testing, compact tray rows |
+| `wander.js` | Pure movement: wandering an island, personal space |
 | `labels.js` | Pure name labels: task-prefix stripping and placement so labels never overlap |
 | `diff.js` | Pure snapshot diff |
 | `color.js` | Colour parsing/mixing, HSL, pastel status colours, theme token reading |

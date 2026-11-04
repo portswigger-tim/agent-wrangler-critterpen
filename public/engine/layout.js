@@ -141,10 +141,11 @@ export function chooseGrid(counts, W, H, maxR = 24) {
 }
 
 /**
- * Full layout for a set of (non-departing) critters: floating islands in the
- * sky over a mainland strip, or a single row when the pen is a short tray.
+ * Full layout for a set of (non-departing) critters: task islands and service
+ * islets floating in the sky, or a single row when the pen is a short tray.
+ * Pass `footprint(kind, scale)` to size service islets for the carrier drawn.
  * Pass the previous result's `anchors` back in to keep islands where they were.
- * @param {{ width: number, height: number, critters: Array<{id:string,taskId:string,taskName:string,parentId?:string}>, anchors?: Map<string,{nx:number,ny:number}> }} input
+ * @param {{ width: number, height: number, critters: Array<{id:string,taskId:string,taskName:string,parentId?:string}>, anchors?: Map<string,{nx:number,ny:number}>, footprint?: Function }} input
  */
 export function computeLayout(input) {
   return input.height < COMPACT_HEIGHT ? computeRowLayout(input) : computeIslandLayout(input);
@@ -240,27 +241,56 @@ function fitCompact(k, cw, ch) {
 
 // ── islands ──────────────────────────────────────────────────────────────────
 
-/** Buildings along the mainland, left to right; the bell stands front and centre. */
-const MAINLAND_ORDER = ['git', 'pr', 'jira', 'human', 'terminal', 'web', 'files'];
+/**
+ * Where each service islet would like to float, as a fraction of the sky: a
+ * fixed mental map (git top-left, PRs top, Jira top-right, shell right, files
+ * bottom-right, the bell front and centre, web bottom-left). Islets lean
+ * toward these spots but may shift to make room for task islands.
+ */
+export const SERVICE_SPOTS = Object.freeze({
+  git: { fx: 0.06, fy: 0.06 }, pr: { fx: 0.5, fy: 0.03 }, jira: { fx: 0.94, fy: 0.06 },
+  terminal: { fx: 0.97, fy: 0.5 }, files: { fx: 0.92, fy: 0.96 }, human: { fx: 0.5, fy: 0.99 },
+  web: { fx: 0.08, fy: 0.96 },
+});
 
 /**
- * The fixed parts of the scene: a mainland strip along the bottom carrying the
- * landmark buildings, and the sky above it where the islands float.
- * Each landmark has `baseY` (where the building stands) and `x`/`y` (its middle,
- * which is what projectiles aim at).
+ * A carrier-free footprint for a service spot when the host supplies none
+ * (the engine passes buildings.js's isletFootprint). Measured from the spot's
+ * top-surface centre: `rx`/`ry` the surface, `top` how far its building rises,
+ * `bottom` how far its underside and caption hang.
  */
-export function sceneFrame(w, h) {
-  const mh = clamp(h * 0.17, 74, 120);
-  const mainland = { x: 0, y: h - mh, w, h: mh };
-  const r = clamp(Math.min((w / MAINLAND_ORDER.length) * 0.3, mh * 0.3), 12, 28);
-  const margin = Math.max(r * 1.8, w * 0.06);
-  const step = (w - 2 * margin) / (MAINLAND_ORDER.length - 1);
-  const baseY = mainland.y + mh * 0.52;
-  const landmarks = MAINLAND_ORDER.map((kind, i) => ({
-    kind, side: 'bottom', r, x: margin + i * step, baseY, y: baseY - r * 1.1,
-  }));
-  const sky = { x: 8, y: 6, w: Math.max(40, w - 16), h: Math.max(60, mainland.y - 12) };
-  return { landmarks, mainland, sky };
+export function defaultFootprint(kind, scale = 1) {
+  const rx = (kind === 'human' ? 140 : 54) * scale, ry = (kind === 'human' ? 32 : 17) * scale;
+  return { rx, ry, top: 112 * scale, bottom: ry * 1.3 + 62 * scale };
+}
+
+/** How big service islets are drawn for critters of radius r. */
+export const isletScale = (r) => clamp(r / 20, 0.55, 1);
+
+/**
+ * The fixed parts of the scene: the sky (the whole pen) and each service's
+ * preferred spot, before packing. Each landmark has `baseY` (where the building
+ * stands) and `x`/`y` (its middle, which projectiles aim at).
+ */
+export function sceneFrame(w, h, footprint = defaultFootprint, scale = 1) {
+  const sky = { x: 8, y: 6, w: Math.max(40, w - 16), h: Math.max(60, h - 12) };
+  const landmarks = Object.entries(SERVICE_SPOTS).map(([kind, { fx, fy }]) => {
+    const fp = footprint(kind, scale);
+    const x = clamp(sky.x + fx * sky.w, sky.x + fp.rx, sky.x + sky.w - fp.rx);
+    const y = clamp(sky.y + fy * sky.h, sky.y + fp.top, sky.y + sky.h - fp.bottom);
+    return serviceLandmark(kind, x, y, scale, fp, sky);
+  });
+  return { landmarks, sky };
+}
+
+/** A landmark record for the service at islet spot (x, y). */
+function serviceLandmark(kind, x, y, scale, fp, sky) {
+  const baseY = y + fp.ry * 0.15;
+  return {
+    kind, x, baseY, y: baseY - fp.top * 0.45, r: 20 * scale,
+    side: y < sky.y + sky.h / 2 ? 'top' : 'bottom',
+    islet: { x, y, scale, fp },
+  };
 }
 
 /** Sessions without a task get a small rocky islet instead of a grassy island. */
@@ -274,21 +304,41 @@ export const isUnassigned = (taskId, taskName) =>
  */
 export function islandSize(k, r) {
   const rx = r * (2.3 + 2.1 * Math.sqrt(Math.max(1, k)));
-  const ry = Math.max(rx * 0.46, r * 1.8);
-  return { rx, ry, half: rx + r * 0.6, top: ry + r * 3, bottom: ry * 2.2 + r + 14 };
+  return islandBox(rx, Math.max(rx * 0.46, r * 1.8), r);
 }
 
+/** An island's packing box from its top ellipse. */
+const islandBox = (rx, ry, r) => ({ rx, ry, half: rx + r * 0.6, top: ry + r * 3, bottom: ry * 2.2 + r + 14 });
+
 const ISLAND_GAP = 14;
+
+/** The free spot (on a grid over the sky) where a box of size `s` has the most clearance from `taken`. */
+function roomiestSpot(s, sky, taken) {
+  const NX = 28, NY = 18;
+  let best = null, bestC = -Infinity;
+  for (let j = 0; j <= NY; j++) {
+    for (let i = 0; i <= NX; i++) {
+      const x = clamp(sky.x + (sky.w * i) / NX, sky.x + s.half, sky.x + sky.w - s.half);
+      const y = clamp(sky.y + (sky.h * j) / NY, sky.y + s.top, sky.y + sky.h - s.bottom);
+      const b = boxAt(s, x, y);
+      let c = Math.min(b.l - sky.x, sky.x + sky.w - b.r, b.t - sky.y, sky.y + sky.h - b.b) * 0.6 + ISLAND_GAP;
+      for (const o of taken) c = Math.min(c, separation(b, o));
+      if (c > bestC + 1e-6) { bestC = c; best = { x, y }; }
+    }
+  }
+  return { p: best, clearance: bestC };
+}
 const boxAt = (s, x, y) => ({ l: x - s.half, r: x + s.half, t: y - s.top, b: y + s.bottom });
 /** Signed separation of two boxes: > 0 apart by that much, < 0 overlapping. */
 const separation = (a, b) => Math.max(a.l - b.r, b.l - a.r, a.t - b.b, b.t - a.b);
 
 /**
  * Place island boxes in the sky without overlaps. Islands with an anchor
- * (their previous spot, normalised to the sky) start there and resist moving;
- * new islands go to the spot with the most clearance; then a relaxation pass
- * pushes apart any that overlap. Deterministic for the same inputs.
- * @param {Array<{id:string, half:number, top:number, bottom:number}>} specs
+ * (their previous spot, normalised to the sky) start there and resist moving
+ * (`m`, default 0.35; `m: 0` pins one exactly); new islands go to the spot
+ * with the most clearance; then a relaxation pass pushes apart any that
+ * overlap. Deterministic for the same inputs.
+ * @param {Array<{id:string, half:number, top:number, bottom:number, anchor?:{nx:number,ny:number}, m?:number}>} specs
  * @param {{x:number,y:number,w:number,h:number}} sky
  * @param {Map<string,{nx:number,ny:number}>} [anchors]
  * @returns {{ pos: Map<string,{x:number,y:number}>, ok: boolean }}
@@ -302,11 +352,14 @@ export function packIslands(specs, sky, anchors = new Map()) {
     p.y = yl > yh ? sky.y + sky.h / 2 : clamp(p.y, yl, yh);
     return p;
   };
+  // Anchored specs first: a spec's own `anchor` (service islets' fixed spots)
+  // or its previous spot; `m` is how readily it moves when pushed.
   for (const s of specs) {
-    const a = anchors.get(s.id);
+    const a = s.anchor || anchors.get(s.id);
     if (!a) continue;
-    const p = fit(s, { x: sky.x + a.nx * sky.w, y: sky.y + a.ny * sky.h });
-    pos.set(s.id, { ...p, ax: p.x, ay: p.y, m: 0.35 });
+    const raw = { x: sky.x + a.nx * sky.w, y: sky.y + a.ny * sky.h };
+    const p = s.m === 0 ? raw : fit(s, raw); // pinned: exactly where it was
+    pos.set(s.id, { ...p, ax: p.x, ay: p.y, m: s.m ?? 0.35 });
   }
   // New islands, biggest first, into the roomiest free spot.
   const fresh = specs.filter((s) => !pos.has(s.id)).sort((a, b) => b.half * (b.top + b.bottom) - a.half * (a.top + a.bottom));
@@ -337,6 +390,7 @@ export function packIslands(specs, sky, anchors = new Map()) {
         const oy = Math.min(a.b, b.b) - Math.max(a.t, b.t) + ISLAND_GAP;
         if (ox <= 0 || oy <= 0) continue;
         clashes++;
+        if (A.p.m + B.p.m === 0) continue; // two pinned islands: nothing may move
         const share = A.p.m / (A.p.m + B.p.m);
         if (ox / Math.max(1, sky.w) < oy / Math.max(1, sky.h)) {
           const dir = A.p.x < B.p.x || (A.p.x === B.p.x && i < j) ? -1 : 1;
@@ -348,6 +402,7 @@ export function packIslands(specs, sky, anchors = new Map()) {
       }
     }
     for (const { s, p } of list) {
+      if (p.m === 0) continue; // pinned: exactly where it is
       // A gentle pull home keeps settled islands from drifting.
       if (it < 80) { p.x += (p.ax - p.x) * 0.04; p.y += (p.ay - p.y) * 0.04; }
       fit(s, p);
@@ -438,37 +493,106 @@ function assignSpots(members, spots, roles) {
   return at;
 }
 
-function computeIslandLayout({ width, height, critters, anchors = new Map() }) {
-  const { landmarks, mainland, sky } = sceneFrame(width, height);
+function computeIslandLayout({ width, height, critters, prev = null, anchors = null, footprint = defaultFootprint }) {
+  const { sky } = sceneFrame(width, height, footprint);
   const groups = groupByTask(critters);
   const roles = roleScales(critters);
   // Islands are sized by the room their crowd takes: a parent counts for more.
   const weight = (g) => g.members.reduce((a, c) => a + roles.get(c.id).scale ** 2, 0);
-  const base = { compact: false, landmarks, mainland, sky, inner: sky, clusters: [] };
-  if (!groups.length) return { ...base, islands: [], spots: new Map(), slots: new Map(), anchors: new Map(), radius: 18, labelWidth: 80 };
+  const base = { compact: false, sky, inner: sky, clusters: [], width, height };
+  // Service islets: fixed preferred spots, slow to move, sized to the critters.
+  const isletSpecs = (r) => Object.entries(SERVICE_SPOTS).map(([kind, { fx, fy }]) => {
+    const fp = footprint(kind, isletScale(r));
+    return { id: `svc:${kind}`, kind, fp, half: fp.rx + 6, top: fp.top, bottom: fp.bottom, anchor: { nx: fx, ny: fy }, m: 0.12 };
+  });
+  const norm = (p) => ({ nx: (p.x - sky.x) / sky.w, ny: (p.y - sky.y) / sky.h });
 
-  const maxR = clamp(Math.min(width, height) / 21, 12, 30), minR = 7;
-  let r = maxR, packed, specs;
-  for (;;) {
-    specs = groups.map((g) => ({ id: g.taskId, ...islandSize(weight(g), r) }));
-    const area = specs.reduce((a, s) => a + 2 * s.half * (s.top + s.bottom), 0);
-    if (area <= sky.w * sky.h * 0.8 || r <= minR) {
-      packed = packIslands(specs, sky, anchors);
-      if (packed.ok || r <= minR) break;
+  // Events must never change the view: unless the pen was resized (or this is
+  // the first layout), everything already placed is pinned exactly where it is.
+  // (An empty pen has nothing to keep still, so the first critters lay out afresh.)
+  const pinned = prev && !prev.compact && prev.width === width && prev.height === height && prev.pins
+    && (prev.islands?.length || prev.ghosts?.length);
+  let r, specs, pos, ghosts = [];
+  if (pinned) {
+    r = prev.radius;
+    const others = []; // pinned boxes an island must not grow into
+    const isl = isletSpecs(r).map((x) => ({ ...x, m: 0 }));
+    const here = new Set(groups.map((g) => g.taskId));
+    // A removed task's island fades where it is; its space stays reserved until a resize.
+    ghosts = [...(prev.ghosts || []), ...(prev.islands || []).filter((i) => !here.has(i.taskId))]
+      .filter((gh) => !here.has(gh.taskId));
+    for (const gh of ghosts) others.push(gh.box);
+    for (const x of isl) { const p = prev.pins.get(x.id); others.push(boxAt(x, p.x, p.y)); }
+    const known = groups.filter((g) => prev.pins.has(g.taskId));
+    for (const g of known) { const p = prev.pins.get(g.taskId); others.push({ id: g.taskId, ...boxAt(prev.specs.get(g.taskId), p.x, p.y) }); }
+    const islandSpecs = groups.map((g) => {
+      const want = islandSize(weight(g), r);
+      const p = prev.pins.get(g.taskId);
+      if (!p) return { id: g.taskId, ...want }; // a new task: free space, nothing moves for it
+      // Grow (or shrink) in place: the centre stays; growth stops at the neighbours.
+      const clear = (k) => {
+        const b = boxAt(islandBox(want.rx * k, want.ry * k, r), p.x, p.y);
+        return others.every((o) => o.id === g.taskId || separation(b, o) >= ISLAND_GAP - 0.5);
+      };
+      let k = 1;
+      if (!clear(1)) {
+        let lo = 0.3, hi = 1;
+        for (let i = 0; i < 20; i++) { const mid = (lo + hi) / 2; if (clear(mid)) lo = mid; else hi = mid; }
+        k = Math.max(lo, Math.min(1, (prev.specs.get(g.taskId)?.rx || want.rx) / want.rx)); // never smaller than it was
+      }
+      return { id: g.taskId, ...islandBox(want.rx * k, want.ry * k, r), m: 0 };
+    });
+    specs = [...isl, ...islandSpecs];
+    // Everything placed stays exactly where it was (no round trip through the sky).
+    pos = new Map();
+    for (const x of specs) if (prev.pins.has(x.id)) pos.set(x.id, prev.pins.get(x.id));
+    const taken = [...ghosts.map((gh) => gh.box), ...specs.filter((x) => pos.has(x.id)).map((x) => boxAt(x, pos.get(x.id).x, pos.get(x.id).y))];
+    // A new task's island goes into the roomiest free spot, shrinking if it must; nothing moves for it.
+    const fresh = specs.filter((x) => !pos.has(x.id)).sort((a, b) => b.half * (b.top + b.bottom) - a.half * (a.top + a.bottom));
+    for (const x of fresh) {
+      let placed = null;
+      for (let k = 1; k >= 0.3 && !placed; k *= 0.9) {
+        const sz = islandBox(x.rx * k, x.ry * k, r);
+        const spot = roomiestSpot(sz, sky, taken);
+        if (spot.clearance >= ISLAND_GAP || k * 0.9 < 0.3) placed = { sz, p: spot.p };
+      }
+      Object.assign(x, placed.sz);
+      pos.set(x.id, placed.p);
+      taken.push(boxAt(x, placed.p.x, placed.p.y));
     }
-    r = Math.max(minR, r * 0.95);
+  } else {
+    const maxR = clamp(Math.min(width, height) / 21, 12, 30), minR = 7;
+    const was = anchors || prev?.anchors || new Map();
+    r = maxR;
+    for (;;) {
+      specs = [...isletSpecs(r), ...groups.map((g) => ({ id: g.taskId, ...islandSize(weight(g), r) }))];
+      const area = specs.reduce((a, x) => a + 2 * x.half * (x.top + x.bottom), 0);
+      if (area <= sky.w * sky.h * 0.8 || r <= minR) {
+        const packed = packIslands(specs, sky, was);
+        pos = packed.pos;
+        if (packed.ok || r <= minR) break;
+      }
+      r = Math.max(minR, r * 0.95);
+    }
   }
 
-  const islands = [], spots = new Map(), slots = new Map(), nextAnchors = new Map();
-  groups.forEach((g, gi) => {
-    const sp = specs[gi], p = packed.pos.get(g.taskId);
+  const specOf = new Map(specs.map((x) => [x.id, x]));
+  const islets = specs.filter((x) => x.kind).map((x) => {
+    const p = pos.get(x.id);
+    return { kind: x.kind, x: p.x, y: p.y, scale: isletScale(r), fp: x.fp, box: boxAt(x, p.x, p.y) };
+  });
+  const islands = [], spots = new Map(), slots = new Map(), nextAnchors = new Map(), pins = new Map();
+  for (const i of islets) pins.set(`svc:${i.kind}`, { x: i.x, y: i.y });
+  for (const g of groups) {
+    const sp = specOf.get(g.taskId), p = pos.get(g.taskId);
     const isl = {
       taskId: g.taskId, taskName: g.taskName, rocky: isUnassigned(g.taskId, g.taskName),
       cx: p.x, cy: p.y, rx: sp.rx, ry: sp.ry, count: g.members.length,
       box: boxAt(sp, p.x, p.y), seed: hash32(g.taskId),
     };
     islands.push(isl);
-    nextAnchors.set(g.taskId, { nx: (p.x - sky.x) / sky.w, ny: (p.y - sky.y) / sky.h });
+    pins.set(g.taskId, { x: p.x, y: p.y });
+    nextAnchors.set(g.taskId, norm(p));
     // Parents in the middle, their children around them; then spread the
     // resting spots so bodies never touch, even with no wandering to push them
     // apart (reduced motion, or the very first frame).
@@ -486,6 +610,10 @@ function computeIslandLayout({ width, height, critters, anchors = new Map() }) {
       const pt = islandPoint(isl, relaxed[i].u, relaxed[i].v, cr);
       slots.set(c.id, { x: pt.x, y: pt.y - cr, r, scale, role }); // body centre, like the row layout
     });
-  });
-  return { ...base, islands, spots, slots, anchors: nextAnchors, radius: r, labelWidth: clamp(r * 6, 110, 150) };
+  }
+  return {
+    ...base, islets, landmarks: islets.map((i) => serviceLandmark(i.kind, i.x, i.y, i.scale, i.fp, sky)),
+    islands, ghosts, spots, slots, anchors: nextAnchors, pins, specs: new Map(islands.map((i) => [i.taskId, specOf.get(i.taskId)])),
+    radius: r, labelWidth: clamp(r * 6, 110, 150),
+  };
 }

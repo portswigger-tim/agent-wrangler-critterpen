@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { computeLayout, packIslands, islandSize, islandPoint, homeSpots, sceneFrame, isUnassigned } from '../layout.js';
-import { createWander, stepWander, separate, randomPoint, bellSlot, wanderPace } from '../wander.js';
+import { createWander, stepWander, separate, randomPoint, wanderPace } from '../wander.js';
 import { rng } from '../util.js';
 import { LANDMARK_KINDS } from '../contract.js';
+import { isletFootprint } from '../buildings.js';
 
 const crit = (id, taskId, extra = {}) => ({ id, taskId, taskName: taskId.toUpperCase(), ...extra });
 const crowd = (n, tasks) => Array.from({ length: n }, (_, i) => crit(`c${i}`, `t${i % tasks}`));
@@ -11,34 +12,35 @@ const boxes = (L) => L.islands.map((i) => i.box);
 const sep = (a, b) => Math.max(a.l - b.r, b.l - a.r, a.t - b.b, b.t - a.b);
 
 function assertNoOverlap(L, label) {
-  const bs = boxes(L);
+  const bs = [...boxes(L), ...L.islets.map((i) => i.box)];
   for (let i = 0; i < bs.length; i++) {
     for (let j = i + 1; j < bs.length; j++) {
-      assert.ok(sep(bs[i], bs[j]) >= 0, `${label}: islands ${L.islands[i].taskId} and ${L.islands[j].taskId} overlap`);
+      assert.ok(sep(bs[i], bs[j]) >= 0, `${label}: boxes ${i} and ${j} overlap`);
     }
     const b = bs[i], sky = L.sky;
     assert.ok(b.l >= sky.x - 0.5 && b.r <= sky.x + sky.w + 0.5 && b.t >= sky.y - 0.5 && b.b <= sky.y + sky.h + 0.5, `${label}: island ${i} leaves the sky`);
   }
 }
 
-test('the scene has a mainland with every landmark building on it, bell in the middle', () => {
-  for (const [w, h] of [[1200, 760], [390, 700], [1800, 500]]) {
-    const { landmarks, mainland, sky } = sceneFrame(w, h);
-    assert.deepEqual(landmarks.map((l) => l.kind).sort(), [...LANDMARK_KINDS].sort());
-    for (const l of landmarks) {
-      assert.ok(l.baseY > mainland.y && l.baseY < h, `${l.kind} stands on the mainland`);
-      assert.ok(l.x - l.r >= 0 && l.x + l.r <= w);
-    }
-    const xs = landmarks.map((l) => l.x).sort((a, b) => a - b);
-    assert.equal(landmarks.find((l) => l.kind === 'human').x, xs[3]);
-    assert.ok(sky.y + sky.h <= mainland.y);
+test('every service gets an islet; "you" sits front and centre, the rest keep their corners', () => {
+  for (const [w, h] of [[1200, 760], [800, 600], [1800, 500]]) {
+    const L = computeLayout({ width: w, height: h, critters: crowd(6, 2), footprint: isletFootprint });
+    assert.deepEqual(L.islets.map((i) => i.kind).sort(), [...LANDMARK_KINDS].sort());
+    assert.deepEqual(L.landmarks.map((l) => l.kind).sort(), [...LANDMARK_KINDS].sort());
+    const at = Object.fromEntries(L.islets.map((i) => [i.kind, i]));
+    assert.ok(Math.abs(at.human.x - w / 2) < w * 0.15 && at.human.y > h * 0.6, `you islet at ${at.human.x.toFixed(0)},${at.human.y.toFixed(0)}`);
+    assert.ok(at.git.x < w / 2 && at.git.y < h / 2, 'git top-left');
+    assert.ok(at.jira.x > w / 2 && at.jira.y < h / 2, 'jira top-right');
+    assert.ok(at.terminal.x > w * 0.6, 'shell on the right');
+    for (const l of L.landmarks) assert.ok(l.baseY != null && l.islet, `${l.kind} stands on an islet`);
   }
 });
+
 
 test('islands never overlap and stay in the sky, across sizes and crowds', () => {
   for (const [w, h] of [[1200, 760], [800, 600], [390, 760], [1600, 480]]) {
     for (const [n, tasks] of [[1, 1], [8, 3], [20, 5], [40, 9]]) {
-      const L = computeLayout({ width: w, height: h, critters: crowd(n, tasks) });
+      const L = computeLayout({ width: w, height: h, critters: crowd(n, tasks), footprint: isletFootprint });
       assert.equal(L.islands.length, tasks);
       assertNoOverlap(L, `${w}x${h} ${n}/${tasks}`);
     }
@@ -141,9 +143,82 @@ test('separate pushes stacked critters apart and stays in the disk', () => {
   for (const p of [a, b]) assert.ok(Math.hypot(p.u, p.v) <= 1 + 1e-9);
 });
 
-test('the bell queue fans out left and right of the bell', () => {
-  const bell = { x: 500, baseY: 700 };
-  const slots = Array.from({ length: 4 }, (_, i) => bellSlot(i, bell, 18));
-  assert.ok(slots[0].x < 500 && slots[1].x > 500 && slots[2].x < slots[0].x && slots[3].x > slots[1].x);
-  assert.equal(new Set(slots.map((s) => s.x)).size, 4);
+
+
+// ── events must not change the view ──────────────────────────────────────────
+
+const centres = (L) => new Map([...L.islands.map((i) => [i.taskId, [i.cx, i.cy]]), ...L.islets.map((i) => [`svc:${i.kind}`, [i.x, i.y]])]);
+
+test('pinned: a long run of joins, spawns, archives and removals never moves an existing island or islet', () => {
+  let critters = crowd(9, 3);
+  let L = computeLayout({ width: 1200, height: 760, critters, footprint: isletFootprint });
+  const start = centres(L), r0 = L.radius;
+  const rand = rng(2024);
+  for (let step = 0; step < 60; step++) {
+    const k = Math.floor(rand() * 4);
+    const task = `t${Math.floor(rand() * 3)}`;
+    if (k === 0) critters = [...critters, crit(`j${step}`, task)]; // joins an existing task
+    else if (k === 1) { // spawns a child into its parent's task
+      const mates = critters.filter((c) => c.taskId === task);
+      if (mates.length) critters = [...critters, crit(`s${step}`, task, { parentId: mates[0].id })];
+    } else if (k === 2 && critters.length > 4) critters = critters.filter((_, i) => i !== Math.floor(rand() * critters.length)); // archived
+    // k === 3: statuses and events change nothing the layout sees
+    L = computeLayout({ width: 1200, height: 760, critters, prev: L, footprint: isletFootprint });
+    assert.equal(L.radius, r0, 'critter size never changes');
+    for (const [id, [x, y]] of centres(L)) {
+      if (!start.has(id)) continue;
+      assert.deepEqual([x, y], start.get(id), `step ${step}: ${id} moved`);
+    }
+  }
+});
+
+test('pinned: a new task goes into free space without moving anyone; a removed one leaves its gap', () => {
+  let critters = crowd(6, 2);
+  const L0 = computeLayout({ width: 1200, height: 760, critters, footprint: isletFootprint });
+  const before = centres(L0);
+  const L1 = computeLayout({ width: 1200, height: 760, critters: [...critters, crit('n1', 'fresh'), crit('n2', 'fresh')], prev: L0, footprint: isletFootprint });
+  for (const [id, xy] of before) assert.deepEqual(centres(L1).get(id), xy, `${id} moved for the new task`);
+  assertNoOverlap(L1, 'with the new task');
+  const fresh = L1.islands.find((i) => i.taskId === 'fresh');
+  for (const o of [...L1.islands.filter((i) => i !== fresh).map((i) => i.box), ...L1.islets.map((i) => i.box)]) assert.ok(sep(fresh.box, o) >= 0);
+  // Remove a task: its island becomes a ghost; nobody slides into the gap.
+  const L2 = computeLayout({ width: 1200, height: 760, critters: critters.filter((c) => c.taskId !== 't0').concat(crit('n1', 'fresh'), crit('n2', 'fresh')), prev: L1, footprint: isletFootprint });
+  assert.deepEqual(L2.ghosts.map((g) => g.taskId), ['t0']);
+  for (const [id, xy] of centres(L2)) if (centres(L1).has(id)) assert.deepEqual(xy, centres(L1).get(id));
+  // A third task lands in free space, not on the ghost.
+  const L3 = computeLayout({ width: 1200, height: 760, critters: [...critters.filter((c) => c.taskId !== 't0'), crit('n1', 'fresh'), crit('z', 'third')], prev: L2, footprint: isletFootprint });
+  const third = L3.islands.find((i) => i.taskId === 'third');
+  assert.ok(sep(third.box, L2.ghosts[0].box) >= 0, 'not on the removed island\'s spot');
+});
+
+test('pinned: an island grows in place, centre fixed, never into a neighbour', () => {
+  let critters = crowd(6, 2);
+  let L = computeLayout({ width: 1000, height: 640, critters, footprint: isletFootprint });
+  const c0 = centres(L).get('t0'), rx0 = L.islands.find((i) => i.taskId === 't0').rx;
+  for (let i = 0; i < 12; i++) {
+    critters = [...critters, crit(`g${i}`, 't0')];
+    L = computeLayout({ width: 1000, height: 640, critters, prev: L, footprint: isletFootprint });
+    assert.deepEqual(centres(L).get('t0'), c0);
+    assertNoOverlap(L, `grow ${i}`);
+  }
+  assert.ok(L.islands.find((i) => i.taskId === 't0').rx >= rx0, 'it grew (or held)');
+});
+
+test('only a resize re-packs, keeping the left-to-right order', () => {
+  const critters = crowd(9, 3);
+  const L0 = computeLayout({ width: 1200, height: 760, critters, footprint: isletFootprint });
+  const L1 = computeLayout({ width: 900, height: 700, critters, prev: L0, footprint: isletFootprint });
+  assert.notDeepEqual([...centres(L1).values()], [...centres(L0).values()], 'a resize may re-pack');
+  const order = (L) => L.islands.slice().sort((a, b) => a.cx - b.cx).map((i) => i.taskId).join();
+  assert.equal(order(L1), order(L0));
+  assertNoOverlap(L1, 'after resize');
+});
+
+test('the first critters lay out afresh, even after an empty layout of the same size', () => {
+  const empty = computeLayout({ width: 980, height: 614, critters: [], footprint: isletFootprint });
+  const L = computeLayout({ width: 980, height: 614, critters: crowd(14, 4), prev: empty, footprint: isletFootprint });
+  const fresh = computeLayout({ width: 980, height: 614, critters: crowd(14, 4), footprint: isletFootprint });
+  assert.equal(L.radius, fresh.radius);
+  assert.deepEqual(L.islands.map((i) => Math.round(i.rx)), fresh.islands.map((i) => Math.round(i.rx)));
+  assertNoOverlap(L, 'first critters');
 });

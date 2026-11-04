@@ -113,13 +113,6 @@ export function relaxSpots(spots, ax, ay, minDist, iterations = 300) {
   return list;
 }
 
-/** Spot i in the queue at the bell: alternating left/right, a little in front. */
-export function bellSlot(i, bell, r) {
-  const side = i % 2 === 0 ? -1 : 1;
-  const step = Math.floor(i / 2) + 1;
-  return { x: bell.x + side * step * r * 2.6, y: bell.baseY + r * 0.35 };
-}
-
 /** Wander speed (disk units/s) and pauses per status; finished, asleep and error stay put. */
 export function wanderPace(status) {
   switch (status) {
