@@ -19,7 +19,8 @@ let critters = [
   { id: 's-ci', name: 'Investigate CI timeouts', taskId: 't1', taskName: TASKS.t1, agent: 'claude', status: 'thinking', parentId: 's-cart' },
   { id: 's-api', name: 'Write API reference', taskId: 't2', taskName: TASKS.t2, agent: 'claude', status: 'needs-you' },
   { id: 's-astro', name: 'Migrate docs to Astro', taskId: 't2', taskName: TASKS.t2, agent: 'codex', status: 'working' },
-  { id: 's-links', name: 'Fix broken links', taskId: 't2', taskName: TASKS.t2, agent: 'claude', status: 'idle' },
+  { id: 's-links', name: 'Fix broken links', taskId: 't2', taskName: TASKS.t2, agent: 'claude', status: 'asleep' },
+  { id: 's-search', name: 'Add search box', taskId: 't2', taskName: TASKS.t2, agent: 'codex', status: 'finished' },
   { id: 's-pm', name: 'Critter Pen PM', taskId: 't3', taskName: TASKS.t3, agent: 'claude', status: 'thinking' },
   { id: 's-engine', name: 'Build animation engine', taskId: 't3', taskName: TASKS.t3, agent: 'claude', status: 'working', parentId: 's-pm' },
   { id: 's-adapter', name: 'Wrangler adapter', taskId: 't3', taskName: TASKS.t3, agent: 'gemini', status: 'working', parentId: 's-pm' },
@@ -53,7 +54,7 @@ window.pens = pens; // handy for poking from the console
 push();
 
 // ── panel ────────────────────────────────────────────────────────────────────
-const STATUS_TOKEN = { working: '--green', thinking: '--blue', 'needs-you': '--yellow', error: '--red', idle: '--surface-2', archived: '--surface-2' };
+const STATUS_TOKEN = { working: '--green', thinking: '--blue', 'needs-you': '--yellow', error: '--red', finished: '--green', idle: '--surface-2', asleep: '--surface-2', archived: '--surface-2' };
 for (const s of STATUSES) {
   const b = document.createElement('button');
   b.innerHTML = `<span class="swatch" style="background:var(${STATUS_TOKEN[s]})"></span>${s}`;
@@ -116,7 +117,7 @@ function fire(id, kind) {
   const label = Math.random() < 0.8 ? pick(LABELS[kind]) : undefined;
   emit({ critterId: id, kind, label });
   if (kind === 'spawn') setTimeout(() => { if (addCritter(c)) push(); }, 650);
-  if (kind === 'done') setTimeout(() => setStatus(id, 'idle'), 900);
+  if (kind === 'done') setTimeout(() => setStatus(id, 'finished'), 900);
   if (kind === 'human') setStatus(id, 'needs-you');
 }
 
@@ -163,7 +164,9 @@ const NEXT = {
   thinking: ['working', 'working', 'needs-you'],
   'needs-you': ['working', 'working'],
   error: ['working', 'thinking'],
-  idle: ['working'],
+  finished: ['idle', 'working'],
+  idle: ['working', 'asleep'],
+  asleep: ['working'],
 };
 function tickStatus() {
   if (playing && !document.hidden) {
@@ -178,7 +181,7 @@ function tickStatus() {
       const parent = pick(critters.filter((x) => x.status === 'working'));
       if (parent) fire(parent.id, 'spawn');
     } else if (r < 0.2) {
-      const extra = critters.filter((x) => x.id.startsWith('s-new-') && x.status === 'idle');
+      const extra = critters.filter((x) => x.id.startsWith('s-new-') && ['idle', 'asleep', 'finished'].includes(x.status));
       if (extra.length) setStatus(pick(extra).id, 'archived');
     }
   }
