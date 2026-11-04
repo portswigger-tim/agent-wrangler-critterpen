@@ -1,8 +1,15 @@
 // Critter Pen: every board session as an animated critter. The browser half
 // (public/index.js) draws the "Critters" view from the board graph.
 //
+// The server half (server/sweep.js) tails Claude transcripts for tool activity
+// and broadcasts it to the browser half: see docs/activity-feed.md.
+//
 // Leaf-safe like every extension manifest: imports nothing from the wrangler,
 // reaches it only through the capability-gated `host`.
+
+import { createActivitySweep } from './server/sweep.js';
+
+const activity = createActivitySweep();
 
 export default {
   id: 'critter-pen',
@@ -15,4 +22,8 @@ export default {
   defaultEnabled: true,
   client: 'public/index.js',
   styles: 'public/styles.css',
+  sweeps: [{ id: 'activity', everyMs: 2000, run: (ctx) => activity.run(ctx) }],
+  // The host stops the sweep; forgetting every offset means turning the
+  // extension back on starts from each transcript's end, not from stale state.
+  deactivate: () => activity.reset(),
 };
