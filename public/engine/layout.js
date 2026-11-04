@@ -273,8 +273,8 @@ export const isUnassigned = (taskId, taskName) =>
  * the cliff + name labels below, used for packing.
  */
 export function islandSize(k, r) {
-  const rx = r * (2.2 + 2.0 * Math.sqrt(Math.max(1, k)));
-  const ry = Math.max(rx * 0.42, r * 1.6);
+  const rx = r * (2.3 + 2.1 * Math.sqrt(Math.max(1, k)));
+  const ry = Math.max(rx * 0.46, r * 1.8);
   return { rx, ry, half: rx + r * 0.6, top: ry + r * 3, bottom: ry * 2.2 + r + 14 };
 }
 
@@ -477,7 +477,7 @@ function computeIslandLayout({ width, height, critters, anchors = new Map() }) {
     const { ax, ay } = islandAxes(isl, r);
     const relaxed = relaxSpots(ordered.map((c) => {
       const { role, scale } = roles.get(c.id);
-      return { ...at.get(c.id), rad: r * scale, m: role === 'parent' ? 0.15 : 1 }; // parents hold the middle
+      return { ...at.get(c.id), rad: r * scale, m: role === 'parent' ? 0.05 : 1 }; // parents hold the middle
     }), ax, ay * DEPTH_WEIGHT, r * PERSONAL_SPACE);
     ordered.forEach((c, i) => {
       const { role, scale } = roles.get(c.id);

@@ -5,6 +5,8 @@
 export const LABEL_PRIORITY = ['needs-you', 'finished', 'working', 'thinking', 'error', 'idle', 'asleep', 'archived'];
 
 const LABEL_H = 16;
+/** Most a label above the head will rise to clear a hat or bubble (px). */
+export const MAX_HEADROOM = 22;
 
 const loose = (s) => String(s || '').toLowerCase().replace(/[\s_-]+/g, ' ').trim();
 
@@ -57,13 +59,17 @@ function candidates(it, w) {
     { x: it.x, y: it.groundY + 10 + LABEL_H },
     { x: it.x - w * 0.35, y: it.groundY + 10 },
     { x: it.x + w * 0.35, y: it.groundY + 10 },
+    { x: it.x - w * 0.6, y: it.groundY + 10 + LABEL_H },
+    { x: it.x + w * 0.6, y: it.groundY + 10 + LABEL_H },
   ];
-  const above = [{ x: it.x, y: it.groundY - it.r * 2.3 - 12 - (it.headroom || 0) }];
+  // Just over the head, clearing a hat or bubble up to MAX_HEADROOM, never adrift.
+  const ay = it.groundY - it.r * 2 - LABEL_H / 2 - 3 - Math.min(it.headroom || 0, MAX_HEADROOM);
+  const above = [{ x: it.x, y: ay }, { x: it.x - w * 0.4, y: ay }, { x: it.x + w * 0.4, y: ay }];
   return it.above ? [...above, ...below] : [...below, ...above];
 }
 
 /**
- * @param {Array<{ id: string, text: string, x: number, groundY: number, r: number, status?: string, above?: boolean, headroom?: number, parent?: boolean }>} items
+ * @param {Array<{ id: string, text: string, x: number, groundY: number, r: number, status?: string, above?: boolean, headroom?: number, parent?: boolean, body?: {cx:number,cy:number,cr:number} }>} items
  * @param {(text: string, item?: object) => number} measure text width in px (item carries e.g. a font)
  * @param {Array<{l:number,r:number,t:number,b:number}>} [blocked] areas labels must avoid
  * @returns {Array<{ id: string, text: string, x: number, y: number, visible: boolean, box: {l:number,r:number,t:number,b:number} }>}
@@ -74,7 +80,13 @@ export function placeLabels(items, measure, blocked = []) {
   // Same status: parents first (they're the ones you click), then front-most.
   const order = [...items].sort((a, b) => rank(a.status) - rank(b.status) || (b.parent ? 1 : 0) - (a.parent ? 1 : 0)
     || b.groundY - a.groundY || (a.id < b.id ? -1 : 1));
-  const taken = [...blocked];
+  // Every critter's body is off limits too, so a name never sits on a neighbour.
+  // `body` is where it is drawn this frame (hops included); else it stands on groundY.
+  const bodies = items.map((it) => {
+    const b = it.body || { cx: it.x, cy: it.groundY - it.r, cr: it.r };
+    return { l: b.cx - b.cr, r: b.cx + b.cr, t: b.cy - b.cr, b: b.cy + b.cr };
+  });
+  const taken = [...blocked, ...bodies];
   const out = [];
   for (const it of order) {
     const w = measure(it.text, it) + 6;
