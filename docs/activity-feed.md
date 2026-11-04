@@ -37,8 +37,10 @@ every 2 s using only today's host API:
 3. **Honest attribution.** If two active cards share a cwd, which happens
    whenever sessions are not in their own worktree, the transcript could belong
    to either, so that cwd is **skipped**: no event beats an event on the wrong
-   critter. Each line's own `cwd` must also equal the card's cwd, which guards
-   against two cwds that map to the same slug.
+   critter. A transcript counts as the card's only if the first `cwd` it records
+   is the card's cwd. That guards against two cwds that map to the same slug
+   (`a/b-c`, `a/b/c`). Later lines can carry another `cwd` after the agent runs
+   `cd`, and that is still the card's own work.
 4. **Incremental and bounded.** Each file is read from a remembered byte offset.
    A file seen for the first time starts at its end, so history is never
    replayed. At most 256 KB is read per file per tick. A file that has run more

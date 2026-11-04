@@ -217,6 +217,17 @@ test('state is dropped when a card leaves, and reset forgets everything', async 
   assert.equal(sweep.watching, 0);
 });
 
+test('a run that overlaps a slow one does nothing rather than read twice', async () => {
+  const file = transcript('/repo');
+  const sweep = sweepFor();
+  const { sent, host } = fakeHost([{ sessionId: 'c', agent: 'claude', cwd: '/repo' }]);
+  await sweep.run({ host });
+  fs.appendFileSync(file, toolLine('/repo', 'Write', {}));
+  const [a, b] = await Promise.all([sweep.run({ host }), sweep.run({ host })]);
+  assert.deepEqual([a.length, b.length].sort(), [0, 1]);
+  assert.equal(sent.length, 1);
+});
+
 test('a missing projects folder or transcript is quiet, not an error', async () => {
   const sweep = createActivitySweep({ projectsDir: path.join(projects, 'nope') });
   const { sent, host } = fakeHost([{ sessionId: 'c', agent: 'claude', cwd: '/does/not/exist' }]);

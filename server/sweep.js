@@ -94,7 +94,8 @@ async function startCwd(file) {
 }
 
 export function createActivitySweep({ projectsDir = claudeProjectsDir(), realpath = fs.realpath } = {}) {
-  const tails = new Map(); // transcript path -> { offset, leftover, sessionId }
+  const tails = new Map(); // transcript path -> { offset, leftover, sessionId, foreign }
+  let running = false; // a slow tick must not overlap the next and read bytes twice
 
   // New complete lines of one transcript since the last tick.
   async function newLines(file, size, sessionId, cwds) {
@@ -144,19 +145,25 @@ export function createActivitySweep({ projectsDir = claudeProjectsDir(), realpat
 
   return {
     async run({ host }) {
-      const cards = watchableCards(host.sessions.list());
-      const live = new Set();
-      const events = [];
-      for (const card of cards) {
-        try {
-          const r = await cardEvents(card);
-          if (r.file) live.add(r.file);
-          events.push(...r.events);
-        } catch { /* one unreadable transcript must not stop the others */ }
+      if (running) return [];
+      running = true;
+      try {
+        const cards = watchableCards(host.sessions.list());
+        const live = new Set();
+        const events = [];
+        for (const card of cards) {
+          try {
+            const r = await cardEvents(card);
+            if (r.file) live.add(r.file);
+            events.push(...r.events);
+          } catch { /* one unreadable transcript must not stop the others */ }
+        }
+        for (const file of tails.keys()) if (!live.has(file)) tails.delete(file);
+        if (events.length) host.broadcast({ kind: 'activity', events });
+        return events;
+      } finally {
+        running = false;
       }
-      for (const file of tails.keys()) if (!live.has(file)) tails.delete(file);
-      if (events.length) host.broadcast({ kind: 'activity', events });
-      return events;
     },
     reset() { tails.clear(); },
     get watching() { return tails.size; },
