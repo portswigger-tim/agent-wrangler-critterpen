@@ -85,7 +85,7 @@ Two independent pieces with one contract between them.
  * }} PenEvent */
 
 // Engine API
-// createPen(el, { theme?: 'auto', reducedMotion?: boolean }) -> {
+// createPen(el, { theme?: 'auto', reducedMotion?: boolean, onCritterClick?: (id) => void }) -> {
 //   setState(PenState), emit(PenEvent), resize(), destroy()
 // }
 ```
