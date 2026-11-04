@@ -174,3 +174,17 @@ test('forEngine: statuses an older engine does not know fall back to idle; a new
   assert.equal(forEngine(state, [...old, 'asleep', 'finished']), state);
   assert.equal(forEngine(state, undefined), state);
 });
+
+test('toPenState: a parentId pointing at a card not on the pen is dropped (archived or off-board parent)', () => {
+  const g = graph([
+    session('p'),
+    session('kid', { spawnedBy: 'p' }),
+    session('orphan', { spawnedBy: 'archived-parent' }),
+    session('hidden', { offBoard: { ext: 'x' } }),
+    session('kid-of-hidden', { parentSession: 'hidden' }),
+  ]);
+  const byId = Object.fromEntries(toPenState(g, NOW).critters.map((c) => [c.id, c]));
+  assert.equal(byId.kid.parentId, 'p');
+  assert.equal('parentId' in byId.orphan, false);
+  assert.equal('parentId' in byId['kid-of-hidden'], false);
+});

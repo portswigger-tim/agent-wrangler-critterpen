@@ -129,7 +129,22 @@ export function toPenState(graph, now = Date.now(), ctx = {}) {
   const taskOf = taskIndex(graph);
   const sessions = boardSessions(graph);
   const full = { ...ctx, busyChildren: busyParents(sessions, now, ctx) };
-  return { critters: sessions.map((s) => critterFor(s, taskOf(s.sessionId), now, full)) };
+  const critters = sessions.map((s) => critterFor(s, taskOf(s.sessionId), now, full));
+  return { critters: dropOrphanParents(critters, ctx.lingering) };
+}
+
+// A parent that is not on the pen (off-board, never adopted, or gone for good)
+// has no critter to leash to, and the engine sizes a critter with a parent as a
+// child, so an orphan keeps no parentId. `alsoPresent` are ids the caller will
+// still emit although they are not board cards: the stateful adapter keeps an
+// archived parent walking off for a few seconds, and its children keep their
+// leash (and their size) until it has gone.
+export function dropOrphanParents(critters, alsoPresent = null) {
+  const onPen = new Set(critters.map((c) => c.id));
+  for (const c of critters) {
+    if (c.parentId && !onPen.has(c.parentId) && !alsoPresent?.has(c.parentId)) delete c.parentId;
+  }
+  return critters;
 }
 
 // What an older engine can draw: a status its contract does not list yet falls

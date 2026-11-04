@@ -132,7 +132,7 @@ reason). A `view`'s `update(el, session, graph)` gets the board's wire graph:
 | --- | --- |
 | `id`, `name`, `agent` | `graph.sessions[].sessionId`, `.label`, `.agent` (`offBoard` cards skipped) |
 | `taskId`, `taskName` | `graph.tasks.assignments[sessionId]` → `graph.tasks.tasks[].name`; none = `adhoc` / "Unassigned" |
-| `parentId` | `.parentSession` (board nesting), else `.spawnedBy` (launch lineage) |
+| `parentId` | `.parentSession` (board nesting), else `.spawnedBy` (launch lineage); kept while an archived parent is still walking off, then omitted once the parent has left PenState (or when it is off-board / was never on the pen), so an orphan is never drawn as a child and a child resizes once, at the end |
 | `needs-you` | `.status === 'needs-you'` (permission prompts, questions, API errors; reason in `.waitingFor`) |
 | `working` | `.status === 'working'` with transcript activity in the last 20 s, or `.rawStatus === 'shell'` (a Bash tool running); or idle but still busy on its own: `.hasBackgroundShell` (the board's green JOB), a `subAgents[]` entry with `status: 'running'`, or a `teammates[]` entry that is `working` |
 | `thinking` | `.status === 'working'` and `.lastActivity` older than 20 s; or "busy elsewhere": idle, but a child on the pen (its `parentSession`/`spawnedBy` points here) is working or thinking (one level) |

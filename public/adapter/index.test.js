@@ -171,3 +171,35 @@ test('the live board\'s real shapes through the stateful adapter', async () => {
   assert.equal(after['0069b540'], 'idle');
   assert.equal(after['69fff775'], 'idle');
 });
+
+test('a child keeps its leash while its archived parent walks off, and loses it once the parent has gone', () => {
+  const a = createAdapter({ archiveGraceMs: 5000 });
+  const parentOf = (state) => state.critters.find((c) => c.id === 'kid').parentId;
+  a.tick(graph([session('p'), session('kid', { spawnedBy: 'p' })]), NOW);
+  // The parent is archived: it is still emitted (walking off) and the child keeps its leash.
+  let s = a.tick(graph([session('kid', { spawnedBy: 'p' })]), NOW + 1000).state;
+  assert.equal(s.critters.find((c) => c.id === 'p').status, 'archived');
+  assert.equal(parentOf(s), 'p');
+  // It left at NOW + 1000, so its 5 s walk-off ends at NOW + 6000.
+  s = a.tick(graph([session('kid', { spawnedBy: 'p' })]), NOW + 5999).state;
+  assert.equal(parentOf(s), 'p');
+  // Grace over: the parent has left PenState, so the leash goes, once.
+  s = a.tick(graph([session('kid', { spawnedBy: 'p' })]), NOW + 6000).state;
+  assert.deepEqual(s.critters.map((c) => c.id), ['kid']);
+  assert.equal(parentOf(s), undefined);
+});
+
+test('a parent that was never on the pen gives no leash, even on the first tick', () => {
+  const a = createAdapter();
+  const s = a.tick(graph([session('kid', { spawnedBy: 'long-gone' })]), NOW).state;
+  assert.equal('parentId' in s.critters[0], false);
+});
+
+test('a departing child keeps its leash to a parent still on the pen, and drops one to a parent that has also gone', () => {
+  const a = createAdapter({ archiveGraceMs: 5000 });
+  a.tick(graph([session('p'), session('kid', { spawnedBy: 'p' })]), NOW);
+  let s = a.tick(graph([session('p')]), NOW + 1000).state;
+  assert.deepEqual(s.critters.find((c) => c.id === 'kid'), { ...s.critters.find((c) => c.id === 'kid'), status: 'archived', parentId: 'p' });
+  s = a.tick(graph([]), NOW + 2000).state; // both now walking off: leash kept between them
+  assert.equal(s.critters.find((c) => c.id === 'kid').parentId, 'p');
+});

@@ -18,7 +18,7 @@
 //              and wakes only on fresh activity (WAKE_WITHIN_MS), so a
 //              lastActivity wobbling around the threshold cannot flicker it.
 
-import { toPenState, boardSessions, isDormant } from './state.js';
+import { toPenState, boardSessions, isDormant, dropOrphanParents } from './state.js';
 import { snapshot, diffSnapshots } from './events.js';
 
 export { toPenState, statusFor, THINKING_AFTER_MS, ADHOC_TASK } from './state.js';
@@ -95,7 +95,11 @@ export function createAdapter({ archiveGraceMs = ARCHIVE_GRACE_MS, unknownGraceM
       }
       track(graph, events, now, selectedId);
 
-      const state = toPenState(graph, now, { finished, quiet: dozing });
+      // Cards that may still be walking off this tick: their children keep their
+      // parentId until the walk-off ends (settled exactly below).
+      const lingering = new Set(lastCritters.keys());
+      for (const [id, d] of departing) if (now - d.leftAt < archiveGraceMs) lingering.add(id);
+      const state = toPenState(graph, now, { finished, quiet: dozing, lingering });
       const unknown = new Set((graph?.sessions || []).filter((s) => s?.status === 'unknown').map((s) => s.sessionId));
       for (const id of unknownSince.keys()) if (!unknown.has(id)) unknownSince.delete(id);
       for (const c of state.critters) {
@@ -110,8 +114,11 @@ export function createAdapter({ archiveGraceMs = ARCHIVE_GRACE_MS, unknownGraceM
       }
       for (const [id, d] of departing) {
         if (present.has(id) || now - d.leftAt >= archiveGraceMs) departing.delete(id);
-        else state.critters.push(d.critter);
+        else state.critters.push({ ...d.critter });
       }
+      // Now the emitted set is exact: a leash to a card that has finished
+      // walking off goes (and a departing card's own leash to one that left).
+      dropOrphanParents(state.critters);
       lastCritters = new Map(state.critters.filter((c) => c.status !== 'archived').map((c) => [c.id, c]));
       return { state, events };
     },
