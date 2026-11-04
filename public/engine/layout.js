@@ -57,6 +57,7 @@ export function landmarkSlots(w, h) {
 }
 
 const TASK_LABEL_H = 18;
+const JITTER_X = 0.24; // total horizontal jitter, as a fraction of radius
 const NAME_LABEL_H = 16;
 
 /** Horizontal / vertical spacing between critters of radius r. */
@@ -128,15 +129,21 @@ export function groupByTask(critters) {
  */
 export function chooseGrid(counts, W, H, maxR = 24) {
   const n = counts.length;
-  let best = { cols: 1, rows: n, r: -1, sq: -1 };
+  let best = { cols: 1, rows: n, r: -1, miss: Infinity };
   for (let cols = 1; cols <= n; cols++) {
     const rows = Math.ceil(n / cols);
     const cw = W / cols, ch = H / rows;
-    const r = Math.min(...counts.map((k) => fitCluster(k, cw, ch, maxR).r));
-    // Ties (radius is capped) go to the most square cells, which spreads
-    // clusters across the pen instead of stacking them in one column.
-    const sq = Math.min(cw, ch);
-    if (r > best.r || (r === best.r && sq > best.sq)) best = { cols, rows, r, sq };
+    const fits = counts.map((k) => fitCluster(k, cw, ch, maxR));
+    const r = Math.min(...fits.map((f) => f.r));
+    // The radius is capped, so many grids tie. Among those, prefer cells whose
+    // shape matches the clusters' natural shape: that fills the pen in both
+    // directions instead of leaving a band of empty space.
+    const miss = fits.reduce((sum, f) => {
+      const sp = spacingFor(f.r);
+      const aspect = (f.cols * sp.col) / (f.rows * sp.row + TASK_LABEL_H + f.r * 1.6);
+      return sum + Math.abs(Math.log((cw / ch) / aspect));
+    }, 0) / n;
+    if (r > best.r + 0.01 || (Math.abs(r - best.r) <= 0.01 && miss < best.miss)) best = { cols, rows, r, miss };
   }
   return { cols: best.cols, rows: best.rows, r: best.r };
 }
@@ -203,7 +210,7 @@ export function computeLayout({ width, height, critters }) {
       const inRow = Math.min(fit.cols, ordered.length - rIdx * fit.cols);
       const rowLeft = left + ((fit.cols - inRow) * colSp) / 2;
       const h = hash32(c.id);
-      const jx = (((h & 0xff) / 255) - 0.5) * fit.r * 0.5;
+      const jx = (((h & 0xff) / 255) - 0.5) * fit.r * JITTER_X;
       const jy = ((((h >>> 8) & 0xff) / 255) - 0.5) * fit.r * 0.35;
       slots.set(c.id, {
         x: rowLeft + colSp * ((i % fit.cols) + 0.5) + jx,
@@ -212,7 +219,8 @@ export function computeLayout({ width, height, critters }) {
       });
     });
     radius = Math.min(radius, fit.r);
-    labelWidth = Math.min(labelWidth, colSp - 6);
+    // Neighbours can jitter toward each other; keep their labels apart.
+    labelWidth = Math.min(labelWidth, colSp - 8 - fit.r * JITTER_X);
     clusters.push({
       taskId: g.taskId, taskName: g.taskName,
       cell: { x: cx0, y: cy0, w: cw, h: ch },

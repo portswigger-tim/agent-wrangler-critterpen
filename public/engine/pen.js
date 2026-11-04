@@ -18,6 +18,7 @@ import {
 const STATUS_BLEND = 0.45; // seconds to cross-fade pose + colour on status change
 const FONT_NAME = '600 11px system-ui, -apple-system, Segoe UI, sans-serif';
 const FONT_TASK = '700 10px system-ui, -apple-system, Segoe UI, sans-serif';
+const FONT_FLOAT = '700 11px system-ui, -apple-system, Segoe UI, sans-serif';
 
 /** Body colour for a status in the current palette. */
 export function statusColor(status, pal) {
@@ -286,10 +287,23 @@ export function createPen(el, opts = {}) {
   }
 
   function floatText(text, x, y, color, dir) {
-    // Stack behind any label still rising from the same spot.
-    const busy = floaters.filter((f) => Math.abs(f.x - x) < 40 && Math.abs(f.y0 - y) < 40 && f.age < 0.9).length;
-    if (busy >= 3) return; // a burst of hits: the pulse says enough
-    floaters.push({ text: String(text).slice(0, 40), x, y: y + dir * busy * 22, y0: y, dir, color, age: 0, dur: 1.9 });
+    text = String(text).slice(0, 40);
+    ctx.font = FONT_FLOAT;
+    const w = ctx.measureText(text).width + 14;
+    const dur = 1.9;
+    // Labels whose pills would overlap this one.
+    const clash = floaters.filter((f) => Math.abs(f.x - x) < (f.w + w) / 2 + 4 && Math.abs(f.y0 - y) < 40 && f.age < f.dur - 0.4);
+    if (layout?.compact) {
+      // No room to stack in the tray: queue behind whatever is showing.
+      const wait = Math.max(0, ...clash.map((f) => f.dur - 0.4 - f.age));
+      if (wait > 2.5) return;
+      floaters.push({ text, w, x, y, y0: y, dir, color, age: -wait, dur });
+    } else {
+      // Stack behind labels still rising from the same spot.
+      const busy = clash.filter((f) => f.age < 0.9).length;
+      if (busy >= 3) return; // a burst of hits: the pulse says enough
+      floaters.push({ text, w, x, y: y + dir * busy * 22, y0: y, dir, color, age: 0, dur });
+    }
     if (floaters.length > 24) floaters.shift();
   }
 
@@ -615,14 +629,6 @@ export function createPen(el, opts = {}) {
       ellipse(ctx, v.cx, v.cy, Math.max(v.rx, v.ry), Math.max(v.rx, v.ry));
       ctx.fill();
       ctx.restore();
-      ctx.font = FONT_TASK;
-      const name = truncateToWidth(v.name.toUpperCase(), v.cell.w - 12, (t) => ctx.measureText(t).width);
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-      ctx.fillStyle = toCss(pal.fg, 0.38 * v.a);
-      if ('letterSpacing' in ctx) /** @type {any} */ (ctx).letterSpacing = '0.08em';
-      ctx.fillText(name, v.cx, v.labelY);
-      if ('letterSpacing' in ctx) /** @type {any} */ (ctx).letterSpacing = '0px';
     }
 
     // Landmarks.
@@ -676,6 +682,7 @@ export function createPen(el, opts = {}) {
     ctx.restore();
 
     list.sort((a, b) => a.s.y.x - b.s.y.x);
+    const hoverSprite = hovered ? sprites.get(hovered) : null;
     for (const { s, pose, r } of list) {
       const color = currentColor(s);
       const groundY = s.y.x;
@@ -712,14 +719,16 @@ export function createPen(el, opts = {}) {
       }
       ctx.restore();
 
-      // Name label.
+      // Name label (the hovered critter's full name is in the tooltip, and
+      // its neighbours' labels step back so nothing collides).
       if (s.labelFor !== s.data.name + '|' + labelWidth) {
         ctx.font = FONT_NAME;
         s.label = truncateToWidth(s.data.name || s.id, labelWidth, (t) => ctx.measureText(t).width);
         s.labelFor = s.data.name + '|' + labelWidth;
       }
-      if (!layout.compact || hovered === s.id) {
-        haloText(ctx, s.label, s.x.x, groundY + 10, pal, (s.status === 'idle' ? 0.6 : 0.85) * a, FONT_NAME);
+      if (!layout.compact && hovered !== s.id) {
+        const near = hoverSprite && Math.abs(hoverSprite.y.x - groundY) < 30 && Math.abs(hoverSprite.x.x - s.x.x) < labelWidth * 1.5;
+        haloText(ctx, s.label, s.x.x, groundY + 10, pal, (s.status === 'idle' ? 0.6 : 0.85) * a * (near ? 0.2 : 1), FONT_NAME);
       }
     }
 
@@ -776,13 +785,30 @@ export function createPen(el, opts = {}) {
       }
     }
 
+    // Task labels sit above the debris so a flurry of paper never hides them.
+    ctx.font = FONT_TASK;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 4;
+    if ('letterSpacing' in ctx) /** @type {any} */ (ctx).letterSpacing = '0.08em';
+    for (const v of clusterViz.values()) {
+      const name = truncateToWidth(v.name.toUpperCase(), v.cell.w - 12, (t) => ctx.measureText(t).width);
+      ctx.strokeStyle = toCss(pal.bg, 0.6 * v.a);
+      ctx.strokeText(name, v.cx, v.labelY);
+      ctx.fillStyle = toCss(pal.fg, 0.4 * v.a);
+      ctx.fillText(name, v.cx, v.labelY);
+    }
+    if ('letterSpacing' in ctx) /** @type {any} */ (ctx).letterSpacing = '0px';
+
     // Floating labels.
     for (const f of floaters) {
+      if (f.age < 0) continue;
       const k = f.age / f.dur;
       const a = k < 0.12 ? k / 0.12 : k > 0.7 ? (1 - k) / 0.3 : 1;
       const y = clamp(f.y + (reduced ? 0 : f.dir * ease.outCubic(k) * 26), 12, H - 12);
-      ctx.font = '700 11px system-ui, -apple-system, Segoe UI, sans-serif';
-      const w = ctx.measureText(f.text).width + 14;
+      ctx.font = FONT_FLOAT;
+      const w = f.w;
       const x = clamp(f.x, w / 2 + 2, W - w / 2 - 2);
       ctx.fillStyle = toCss(pal.dark ? lighten(pal['surface-2'], 0.08) : { r: 255, g: 255, b: 255, a: 1 }, 0.95 * a);
       roundRect(ctx, x - w / 2, y - 10, w, 20, 10);
