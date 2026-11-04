@@ -1,0 +1,11 @@
+{
+  "name": "critter-pen-engine",
+  "private": true,
+  "type": "module",
+  "description": "Framework-free Canvas 2D renderer for Critter Pen. No dependencies.",
+  "main": "pen.js",
+  "scripts": {
+    "test": "node --test test/",
+    "demo": "python3 -m http.server 8080"
+  }
+}
