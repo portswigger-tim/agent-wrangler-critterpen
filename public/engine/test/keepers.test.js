@@ -126,3 +126,18 @@ test('every keeper draws in both themes and at every stage, with save/restore ba
     }
   }
 });
+
+test('dark themes give keepers a soft pale rim; light themes need none', async () => {
+  const { keeperRim, KSIZE } = await import('../buildings.js');
+  assert.ok(KSIZE >= 1.8, 'keepers read at board size');
+  for (const k of KEEPER_KINDS) {
+    assert.equal(keeperRim(k, palFor('light')), null);
+    const rim = keeperRim(k, palFor('dark'));
+    assert.ok(rim && rim.alpha > 0.3 && rim.blur > 0, k);
+    assert.ok(rgbToHsl(rim.color).l > rgbToHsl(keeperColors(k, palFor('dark')).body).l, `${k}: rim lighter than the body`);
+    // The rim is actually applied when drawing.
+    const r = recordingCtx();
+    drawKeeper(r.ctx, k, 0, 0, 1, palFor('dark'), 0);
+    assert.ok(String(r.ctx.shadowColor || '').startsWith('rgba('), `${k}: shadowColor set`);
+  }
+});
