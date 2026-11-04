@@ -129,7 +129,13 @@ export function toPenState(graph, now = Date.now(), ctx = {}) {
   const taskOf = taskIndex(graph);
   const sessions = boardSessions(graph);
   const full = { ...ctx, busyChildren: busyParents(sessions, now, ctx) };
-  return { critters: sessions.map((s) => critterFor(s, taskOf(s.sessionId), now, full)) };
+  const critters = sessions.map((s) => critterFor(s, taskOf(s.sessionId), now, full));
+  // A parent that is not on the pen (archived, off-board, never adopted) has no
+  // critter to leash to, and the engine sizes a critter with a parent as a
+  // child, so an orphan keeps no parentId.
+  const onPen = new Set(critters.map((c) => c.id));
+  for (const c of critters) if (c.parentId && !onPen.has(c.parentId)) delete c.parentId;
+  return { critters };
 }
 
 // What an older engine can draw: a status its contract does not list yet falls
