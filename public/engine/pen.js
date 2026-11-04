@@ -7,6 +7,7 @@ import { readTheme, toCss, mix, lighten, darken, ensureContrast } from './color.
 import { computeLayout, islandPoint, LANDMARK_LABELS } from './layout.js';
 import { createWander, stepWander, wanderPace, separate, bellSlot } from './wander.js';
 import { drawIsland, drawSignpost, drawMainland, drawBuilding } from './scene.js';
+import { placeLabels } from './labels.js';
 import { diffCritters } from './diff.js';
 import {
   ACCESSORIES, agentTint, kindColor, drawCritter, drawShadow, drawBubble, drawThinkingDots,
@@ -404,8 +405,27 @@ export function createPen(el, opts = {}) {
       const v = islandViz.get(id);
       // Depth counts for less than width: a critter standing behind another is
       // hidden by it unless they're well apart front-to-back.
-      if (v && list.length > 1) separate(list, layout.radius * 2.4, Math.max(1, v.rx - layout.radius * 0.9), Math.max(1, v.ry - layout.radius * 0.4) * 0.5, 0.2);
+      if (v && list.length > 1) separate(list, layout.radius * 2.7, Math.max(1, v.rx - layout.radius * 0.9), Math.max(1, v.ry - layout.radius * 0.4) * 0.5, 0.35);
     }
+  }
+
+  /** Building captions and island name planks: places name labels must not cover. */
+  function labelObstacles() {
+    if (!layout?.mainland) return [];
+    const out = [];
+    ctx.font = '600 10px system-ui, -apple-system, Segoe UI, sans-serif';
+    for (const lm of layout.landmarks) {
+      const w = ctx.measureText(LANDMARK_LABELS[lm.kind]).width + 8;
+      out.push({ l: lm.x - w / 2, r: lm.x + w / 2, t: lm.baseY + 4, b: lm.baseY + 18 });
+    }
+    ctx.font = '700 10px system-ui, -apple-system, Segoe UI, sans-serif';
+    const sc = clamp(layout.radius / 18, 0.8, 1.15);
+    for (const v of islandViz.values()) {
+      const w = Math.min(150, ctx.measureText(v.taskName || '').width + 14) * sc;
+      const top = v.cy + v.bob + v.ry * 1.3 + 4;
+      out.push({ l: v.cx - w / 2, r: v.cx + w / 2, t: top, b: top + 17 * sc });
+    }
+    return out;
   }
 
   /** Advance a hop along an arc toward (tx, ty); true once it has landed. */
@@ -865,21 +885,16 @@ export function createPen(el, opts = {}) {
       }
       if (!layout.compact && hovered !== s.id) {
         const near = hoverSprite && Math.abs(hoverSprite.y.x - groundY) < 30 && Math.abs(hoverSprite.x.x - s.x.x) < labelWidth * 1.5;
-        labels.push({ s, text: s.label, x: s.x.x, y: groundY + 10, alpha: (s.status === 'asleep' ? 0.6 : 0.85) * a * (near ? 0.2 : 1) });
+        labels.push({ id: s.id, text: s.label, x: s.x.x, groundY, r, status: s.status, above: s.place === 'bell', alpha: (s.status === 'asleep' ? 0.6 : 0.85) * a * (near ? 0.2 : 1) });
       }
     }
 
-    // ── islands / wander ── name labels over all critters, front-most first;
-    // a label that would sit on one already drawn steps back to a whisper.
+    // ── islands / wander ── name labels over all critters, placed most
+    // important first (labels.js); one with no clear spot steps back to a whisper.
     ctx.font = FONT_NAME;
-    labels.sort((p, q) => q.y - p.y);
-    const taken = [];
-    for (const l of labels) {
-      const w = ctx.measureText(l.text).width + 6;
-      const box = { l: l.x - w / 2, r: l.x + w / 2, t: l.y - 7, b: l.y + 7 };
-      const clash = taken.some((o) => box.l < o.r && box.r > o.l && box.t < o.b && box.b > o.t);
-      if (!clash) taken.push(box);
-      haloText(ctx, l.text, l.x, l.y, pal, l.alpha * (clash ? 0.12 : 1), FONT_NAME);
+    const alphaOf = new Map(labels.map((l) => [l.id, l.alpha]));
+    for (const l of placeLabels(labels, (t) => ctx.measureText(t).width, labelObstacles())) {
+      haloText(ctx, l.text, l.x, l.y, pal, alphaOf.get(l.id) * (l.visible ? 1 : 0.12), FONT_NAME);
     }
 
     // Particles.
