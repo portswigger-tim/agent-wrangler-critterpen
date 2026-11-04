@@ -8,20 +8,22 @@ import { kindColor, roundRect, ellipse, haloText } from './art.js';
 const C = (hex) => parseColor(hex);
 const NATURE = {
   light: {
-    grass: C('#93d27c'), grassDark: C('#5fae5a'), dirt: C('#c08a5c'), dirtDark: C('#86583a'),
+    grass: C('#a1c975'), grassDark: C('#6fa158'), dirt: C('#c08a5c'), dirtDark: C('#86583a'),
     rock: C('#b3b8bf'), rockDark: C('#7d848e'), wood: C('#d2a26a'), woodDark: C('#8b6440'),
     wall: C('#f4ead8'), ink: C('#4a3020'), gold: C('#f2b51e'),
   },
   dark: {
-    grass: C('#5fa865'), grassDark: C('#3c7a48'), dirt: C('#82603f'), dirtDark: C('#4d3626'),
+    grass: C('#6c9a55'), grassDark: C('#46703a'), dirt: C('#82603f'), dirtDark: C('#4d3626'),
     rock: C('#727a85'), rockDark: C('#4a5059'), wood: C('#a27a50'), woodDark: C('#6b4d33'),
     wall: C('#cdbfa6'), ink: C('#2b1c12'), gold: C('#f5c542'),
   },
 };
-/** Nature colours, nudged toward the theme's green so islands sit in any palette. */
+/**
+ * Nature colours for the theme's light/dark mode. The grass is a mossy olive,
+ * kept well away from the theme's --green so working critters pop off it.
+ */
 export function naturePalette(pal) {
-  const n = NATURE[pal.dark ? 'dark' : 'light'];
-  return { ...n, grass: mix(n.grass, pal.green, 0.18), grassDark: mix(n.grassDark, pal.green, 0.12) };
+  return NATURE[pal.dark ? 'dark' : 'light'];
 }
 
 const outlines = new Map();
