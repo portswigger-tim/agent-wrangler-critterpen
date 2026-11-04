@@ -93,11 +93,12 @@ islet (`buildings.js`, the artist's; the carrier is drawn separately so it can b
 re-skinned). Placement is carrier-independent: `layout.js` gets a footprint function
 (`isletFootprint`) and treats each service as a box with a preferred spot, a fixed
 mental map: git top-left, PRs top, Jira top-right, shell right, files bottom-right, web
-bottom-left, and the **"you" islet** front and centre (`layout.SERVICE_SPOTS`). Islets
-lean toward their spots but may shift away from task islands on a full pack. A critter
-that needs you hops over and queues outside the "you" building
-(`buildings.bellQueueSlots`); the building glows softly while anyone waits (no count:
-another extension shows that). Projectiles arc from the critter to the service's
+bottom-left, and the **"you" islet** (a red phone box) front and centre
+(`layout.SERVICE_SPOTS`). Islets lean toward their spots but may shift away from task
+islands on a full pack. A critter that needs you hops over and queues outside the phone
+box (`buildings.bellQueueSlots`); the one at the front (`PHONE_HOLDER_SLOT`) stands still
+holding the receiver on its curly cord, and the phone rings while anyone waits (no
+count: another extension shows that). Projectiles arc from the critter to the service's
 building: git = little commit dots, PR = paper plane, Jira = ticket card, terminal =
 sparks, files = paper scraps, web = tiny balloon; the building plays its hit animation.
 

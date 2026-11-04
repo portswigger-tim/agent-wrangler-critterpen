@@ -7,7 +7,8 @@ import { readTheme, toCss, mix, lighten, darken, statusColor } from './color.js'
 import { computeLayout, islandPoint, pickAt, LANDMARK_LABELS } from './layout.js';
 import { createWander, stepWander, wanderPace, separate, islandAxes, PERSONAL_SPACE, DEPTH_WEIGHT } from './wander.js';
 import { drawIsland, drawSignpost, drawBuilding, drawLeash } from './scene.js';
-import { drawCarrier, drawServiceBuilding, drawCaptionPlank, isletFootprint, isletBob, bellQueueSlots, buildingFootprint } from './buildings.js';
+import { drawCarrier, drawServiceBuilding, drawCaptionPlank, isletFootprint, isletBob, bellQueueSlots, buildingFootprint,
+  PHONE_HOLDER_SLOT, phoneSocket, receiverSpot, drawPhoneReceiver } from './buildings.js';
 import { placeLabels, stripTaskPrefix, shortLabel } from './labels.js';
 import { diffCritters } from './diff.js';
 import {
@@ -461,7 +462,7 @@ export function createPen(el, opts = {}) {
     const base = isletBase(isl);
     const slots = bellQueueSlots(isl.scale, layout.radius, Math.max(8, n + 1));
     const q = slots[Math.min(n, slots.length - 1)];
-    return { x: base.x + q.dx, y: base.y + q.dy, lookX: base.x, lookY: base.y - isl.fp.top * 0.5 };
+    return { x: base.x + q.dx, y: base.y + q.dy, side: q.side, base, scale: isl.scale, lookX: base.x, lookY: base.y - isl.fp.top * 0.5 };
   }
 
   /** Advance a hop along an arc toward (tx, ty); true once it has landed. */
@@ -943,7 +944,11 @@ export function createPen(el, opts = {}) {
     list.sort((a, b) => a.s.y.x - b.s.y.x);
     const hoverSprite = hovered ? sprites.get(hovered) : null;
     const labels = [];
+    // ── islands / wander ── the front of the phone queue holds the receiver, standing still.
+    const holderId = layout.islets && bellQueue[PHONE_HOLDER_SLOT];
     for (const { s, pose, r } of list) {
+      const holding = s.id === holderId && s.place === 'bell' && !s.hop && s.life === 'live';
+      if (holding) { pose.dy = 0; pose.lift = 0; pose.wave = null; pose.feetDrop = 0; }
       const color = currentColor(s);
       const groundY = s.y.x;
       drawShadow(ctx, s.x.x + pose.dx, groundY, r, pose.lift, pal, s.alpha);
@@ -959,6 +964,10 @@ export function createPen(el, opts = {}) {
         accessory: s.accessory, tint: s.tint, eyeInk: s.eyeInk,
         phase: s.phase, spin: s.spin, flip: s.flip,
       }, pal, time);
+      if (holding) {
+        const q = youSpot(PHONE_HOLDER_SLOT), sock = phoneSocket(q.scale), rs = receiverSpot(r, q.side);
+        drawPhoneReceiver(ctx, q.base.x + sock.dx * q.side, q.base.y + sock.dy, s.x.x + pose.dx + rs.dx, groundY + rs.dy, q.scale, pal, reduced ? 0 : time);
+      }
 
       // Status overlays (drawn upright, outside the squash).
       const headY = s.cy - r * 1.2;
@@ -1068,7 +1077,7 @@ export function createPen(el, opts = {}) {
 
     // ── islands / wander ── name planks over the debris, so a flurry of paper never hides them.
     if (layout.islets) {
-      for (const i of layout.islets) drawCaptionPlank(ctx, i.x, isletBase(i).captionY, LANDMARK_LABELS[i.kind], pal, i.scale);
+      for (const i of layout.islets) drawCaptionPlank(ctx, i.x, isletBase(i).captionY, LANDMARK_LABELS[i.kind], pal, i.scale, { kind: i.kind });
       for (const v of islandViz.values()) {
         drawSignpost(ctx, v.cx, v.cy + v.bob + v.ry * 1.3 + 4, v.taskName, pal, { scale: clamp(layout.radius / 18, 0.8, 1.15), alpha: v.a, hang: true });
       }

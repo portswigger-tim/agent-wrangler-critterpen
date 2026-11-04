@@ -15,7 +15,7 @@ PR mailbox, a ticket at the Jira post office.
 | --- | --- |
 | Green, hopping | Working: running tools, a background job (the board's **JOB**), or a running sub-agent or agent-team member |
 | Blue, bobbing with "…" | Thinking: working but quiet for a while, or idle while a session it spawned or nests is still working |
-| Amber, "!", queued at the "you" islet | Needs you: a permission prompt, a question or an API error |
+| Amber, "!", queued at the phone box | Needs you: a permission prompt, a question or an API error. The one at the front holds the receiver |
 | Red, dizzy, smoking | One of its own PRs has failing checks |
 | Lilac, sitting, with a ✓ | Finished a turn you haven't looked at yet. Clicking the critter or opening the session on the board clears it. Remembered per browser, and it never dozes off |
 | Grey, awake and relaxed | Idle at its prompt |
@@ -26,7 +26,9 @@ PR mailbox, a ticket at the Jira post office.
 - **Services:** each service (git, PRs, Jira, shell, web, files) has a building on its
   own islet around the edge, always in roughly the same place (git top-left, PRs top,
   Jira top-right, shell right, files bottom-right, web bottom-left). The "you" islet
-  sits front and centre; critters that need you hop over and queue outside it.
+  with its red phone box sits front and centre: critters that need you hop over and
+  queue outside, the front one holding the receiver, and the phone rings while anyone
+  waits.
 - **A steady view:** nothing moves the scene but a resize of the pen. Islands and islets
   stay exactly where they are as sessions change status, do things, spawn or finish. A
   new task's island appears in free space; a closed task's island fades where it was
