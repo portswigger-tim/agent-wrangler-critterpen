@@ -22,7 +22,7 @@ import { drawAmbient, drawSky } from './ambient.js';
 /** @typedef {import('./contract.js').PenOptions} PenOptions */
 
 const STATUS_BLEND = 0.45; // seconds to cross-fade pose + colour on status change
-const FONT_NAME = '600 11px system-ui, -apple-system, Segoe UI, sans-serif';
+const FONT_NAME = '700 12px system-ui, -apple-system, Segoe UI, sans-serif'; // labels.js LABEL_H matches
 const FONT_TASK = '700 10px system-ui, -apple-system, Segoe UI, sans-serif';
 const FONT_FLOAT = '700 11px system-ui, -apple-system, Segoe UI, sans-serif';
 
@@ -778,6 +778,14 @@ export function createPen(el, opts = {}) {
     return glance(s, pose, r);
   }
 
+  /** Px above the head taken by a hat or a status bubble, so a label placed above clears it. */
+  function headroomOf(s, r) {
+    const sc = clamp(r / 18, 0.6, 1.1);
+    if (s.status === 'needs-you' || s.status === 'finished') return 25 * sc + r * 0.3; // '!' / '✓' bubble
+    if (s.status === 'thinking' || s.status === 'error') return r * (s.accessory === 'none' ? 0.5 : 1);
+    return s.accessory === 'none' ? 0 : r * 0.6;
+  }
+
   // ── personality hooks ── eyes: glance at a nearby cursor, then ease the gaze.
   const unit = (dx, dy) => { const d = Math.hypot(dx, dy) || 1; return { x: dx / d, y: dy / d }; };
   function neighboursOf(s) {
@@ -961,7 +969,7 @@ export function createPen(el, opts = {}) {
       }
       if (!layout.compact && hovered !== s.id) {
         const near = hoverSprite && Math.abs(hoverSprite.y.x - groundY) < 30 && Math.abs(hoverSprite.x.x - s.x.x) < labelWidth * 1.5;
-        labels.push({ id: s.id, text: s.label, x: s.x.x, groundY, r, status: s.status, above: s.place === 'bell', alpha: (s.status === 'asleep' ? 0.6 : 0.85) * a * (near ? 0.2 : 1) });
+        labels.push({ id: s.id, text: s.label, x: s.x.x, groundY, r, status: s.status, above: s.place === 'bell', headroom: headroomOf(s, r), alpha: (s.status === 'asleep' ? 0.6 : 0.85) * a * (near ? 0.2 : 1) });
       }
     }
 

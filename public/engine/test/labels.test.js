@@ -62,3 +62,12 @@ test('placement is deterministic', () => {
   const items = NAMES.map((t, i) => ({ id: `x${i}`, text: t, x: 100 + (i % 3) * 30, groundY: 200 + (i % 2) * 8, r: 18, status: 'working' }));
   assert.deepEqual(placeLabels(items, measure), placeLabels([...items].reverse(), measure));
 });
+
+test('a label placed above the head clears the headroom of a hat or bubble', () => {
+  const measure = (t) => t.length * 7;
+  const base = { id: 'q', text: 'Write API reference', x: 500, groundY: 700, r: 18, status: 'needs-you', above: true };
+  const [plain] = placeLabels([base], measure);
+  const [raised] = placeLabels([{ ...base, headroom: 30 }], measure);
+  assert.equal(plain.y - raised.y, 30);
+  assert.ok(raised.box.b < 700 - 18 * 2 - 30, 'label bottom sits above head + headroom');
+});
