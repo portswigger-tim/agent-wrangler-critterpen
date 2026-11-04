@@ -887,7 +887,9 @@ export function createPen(el, opts = {}) {
     mo.observe(n, { attributes: true, attributeFilter: ['class', 'style', 'data-theme', 'theme'] });
   }
   const mqDark = matchMedia('(prefers-color-scheme: dark)');
-  const onReduce = () => { if (opts.reducedMotion == null) { reduced = mqReduce.matches; needsLayout = true; } };
+  // An OS change is the user's latest word, so it wins over the initial option
+  // or a setOptions() override. Hosts often pass a snapshot of this very query.
+  const onReduce = () => { reduced = mqReduce.matches; needsLayout = true; };
   mqDark.addEventListener?.('change', refreshTheme);
   mqReduce.addEventListener?.('change', onReduce);
 
@@ -931,10 +933,12 @@ export function createPen(el, opts = {}) {
     setState,
     emit,
     resize,
-    /** Extra (not in the contract): switch theme mode or reduced motion at runtime. */
+    /** Extra (not in the contract): switch theme mode or reduced motion at runtime
+     * (null/undefined reducedMotion = follow the OS). An override lasts until the
+     * next prefers-reduced-motion change. */
     setOptions(o = {}) {
       if (o.theme) { themeMode = o.theme; setPalette(readTheme(el, themeMode)); }
-      if (o.reducedMotion !== undefined) { opts.reducedMotion = o.reducedMotion; reduced = o.reducedMotion ?? mqReduce.matches; needsLayout = true; }
+      if ('reducedMotion' in o) { reduced = o.reducedMotion ?? mqReduce.matches; needsLayout = true; }
     },
     destroy() {
       destroyed = true;

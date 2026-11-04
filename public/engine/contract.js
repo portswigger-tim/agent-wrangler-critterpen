@@ -42,7 +42,8 @@
 /**
  * @typedef {Object} PenOptions
  * @property {'auto'|'light'|'dark'} [theme]   'auto' (default) reads CSS variables from the host element
- * @property {boolean} [reducedMotion]         defaults to the `prefers-reduced-motion` media query
+ * @property {boolean} [reducedMotion]         initial mode; defaults to the `prefers-reduced-motion` media query,
+ *                                             and later changes to that query always apply
  * @property {(id: string) => void} [onCritterClick]  critter clicked (el also dispatches a bubbling 'critter-click' CustomEvent, detail { id })
  */
 

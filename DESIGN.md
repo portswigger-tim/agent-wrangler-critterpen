@@ -87,6 +87,7 @@ Two independent pieces with one contract between them.
 // createPen(el, { theme?: 'auto', reducedMotion?: boolean, onCritterClick?: (id) => void }) -> {
 //   setState(PenState), emit(PenEvent), resize(), destroy()
 // }
+// reducedMotion sets the starting mode; later prefers-reduced-motion changes always apply.
 ```
 
 `spawn` makes the parent fire a "baby" critter that pops into existence; `done`
