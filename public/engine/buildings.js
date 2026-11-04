@@ -379,9 +379,9 @@ const BUILDINGS = {
     }
   },
 
-  human(ctx, u, n, col, hp, t, pal, waiting) { // a little red phone box that rings while anyone waits
+  human(ctx, u, n, col, hp, t, pal, waiting, reduced) { // a little red phone box that rings while anyone waits
     const red = phoneRed(pal), edge = inkFor(red, 0.45), lightRed = lighten(red, 0.18);
-    const ring = waiting > 0.01 ? phoneRinging(t) : 0;
+    const ring = waiting > 0.01 ? (reduced ? 1 : phoneRinging(t)) : 0; // reduced: arcs shown, still
     // Wobble: a quick shiver while ringing, a bigger one on a hit (t is 0 under reduced motion).
     const wob = Math.sin(t * 55) * 0.03 * ring * waiting + hp.shake * 0.07;
     ctx.save();
@@ -574,7 +574,7 @@ export function drawServiceBuilding(ctx, kind, x, y, scale, pal, t, o = {}) {
   ctx.scale(1 + 0.08 * hp.squash, 1 - 0.1 * hp.squash);
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
-  BUILDINGS[kind](ctx, u, n, buildingColor(kind, pal), hp, reduced ? 0 : t, pal, clamp(waiting, 0, 1));
+  BUILDINGS[kind](ctx, u, n, buildingColor(kind, pal), hp, reduced ? 0 : t, pal, clamp(waiting, 0, 1), reduced);
   ctx.restore();
 }
 

@@ -179,3 +179,11 @@ test('phone box keeps the bell footprint, so placement is unchanged', () => {
   assert.ok(Math.abs(f.top - (48 * UNIT + 12)) < 1e-9);
   assert.ok(Math.abs(buildingFootprint('human', 1).w - 44 * UNIT) < 1e-9);
 });
+
+test('phone box under reduced motion: ring arcs show while anyone waits, and hold still', () => {
+  const pal = palFor('light');
+  const arcs = (o, t = 0) => { const r = recordingCtx(); drawServiceBuilding(r.ctx, 'human', 100, 200, 1, pal, t, o); return r.calls.filter((c) => c.startsWith('arc(')); };
+  assert.ok(arcs({ reduced: true, waiting: 1 }).length >= 4, 'arcs while waiting');
+  assert.equal(arcs({ reduced: true, waiting: 0 }).length, 0, 'none when nobody waits');
+  assert.deepEqual(arcs({ reduced: true, waiting: 1 }, 0), arcs({ reduced: true, waiting: 1 }, 7.3), 'no motion');
+});
