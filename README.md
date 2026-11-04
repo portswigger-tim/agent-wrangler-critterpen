@@ -17,16 +17,21 @@ the Jira post office.
 | Blue, bobbing with "…" | Thinking: working but quiet for a while, or waiting on sessions it spawned |
 | Amber, "!", at the bell | Needs you: a permission prompt, a question or an API error |
 | Red, dizzy, smoking | One of its own PRs has failing checks |
-| Awake, with a ✓ | Finished a turn you haven't looked at yet |
-| Awake and relaxed | Idle at its prompt |
-| Asleep, "z z z" | No live terminal (the board's **RESUME**), snoozed, or quiet for 30+ min |
+| Lilac, sitting, with a ✓ | Finished a turn you haven't looked at yet |
+| Grey, awake and relaxed | Idle at its prompt |
+| Grey, dozing, "z z z" | No live terminal (the board's **RESUME**), snoozed, or quiet for 30+ min |
 | Waves and walks off | Archived |
 
 - **Islands:** sessions without a task share a small rocky islet.
+- **Personality:** now and then a critter yawns, stretches, looks around, hums or
+  chats with an islandmate. Eyes follow your cursor when it's close, siblings wave
+  at a newly spawned critter, and a finished critter does a happy wiggle. Each
+  critter's quirks are seeded from its session id, so they never fall into step.
 - **Leashes:** a dotted leash joins a session to the sessions it spawned.
 - **Click:** clicking a critter opens its session on the board.
 - **Reduced motion:** the pen follows your OS reduced-motion setting live, swapping
-  motion for colour and opacity changes.
+  motion for colour and opacity changes. Personality and ambient fireflies or petals
+  switch off, and glances become instant.
 - **Themes:** colours come from the board theme, so every Agent Wrangler theme works.
 
 Critter Pen deliberately shows no "needs you" counts or badges.
