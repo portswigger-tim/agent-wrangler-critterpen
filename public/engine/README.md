@@ -46,7 +46,8 @@ cd public/engine && npm test   # node --test, no dependencies
 | `art.js` | Vector drawing: critters (eyes, lids, mouths), accessories, bubbles, projectiles |
 | `behaviour.js` | Personality: rare, seeded, deterministic idle behaviours and pose modifiers |
 | `ambient.js` | Sky, fireflies (dark) and petals/motes (light); stateless |
-| `buildings.js` | Service buildings (bigger, with hit animations and plank captions), kept apart from their carrier (floating islets) |
+| `buildings.js` | Service buildings (incl. the "you" phone box and its receiver cord), hit animations, caption planks, kept apart from their carrier (floating islets) |
+| `brand/` | Official third-party marks used on caption planks (Git only), with `NOTICE.md` |
 | `scene.js` | Scenery: floating islands, name planks, leashes, the compact tray's small buildings |
 | `layout.js` | Pure layout: island sizing, service islet placement and packing, pinning (events never move anything), size by role, home spots, hit testing, compact tray rows |
 | `wander.js` | Pure movement: wandering an island, personal space |

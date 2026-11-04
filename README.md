@@ -60,6 +60,10 @@ PR mailbox, a ticket at the Jira post office.
 
 Critter Pen deliberately shows no "needs you" counts or badges.
 
+Critter Pen never navigates or changes your view on its own: nothing it sees (a
+finished turn, a session needing you, new activity) opens, selects or scrolls to
+anything. Only clicking a critter opens its session.
+
 ## Install
 
 In Agent Wrangler, open **Settings → Extensions → + Add extension → Git URL** and paste:
@@ -133,3 +137,13 @@ changing code, run `scripts/dev-install.sh` again and restart the dev wrangler.
 npm test                          # everything: adapter, contract, classifier, sweep, engine
 cd public/engine && npm test      # engine only
 ```
+
+## Trademarks
+
+Critter Pen is an independent project and is not affiliated with, sponsored by or
+endorsed by GitHub, Atlassian, the Git Project or Software Freedom Conservancy. The
+git building's sign shows the official Git logomark, unaltered apart from size. Git
+Logo by Jason Long is licensed under the Creative Commons Attribution 3.0 Unported
+License; Git and the Git logo are trademarks of Software Freedom Conservancy, Inc.
+Other services are named in plain text only. Sources, licences and the rules the
+pen follows are in [public/engine/brand/NOTICE.md](public/engine/brand/NOTICE.md).

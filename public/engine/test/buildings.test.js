@@ -146,3 +146,44 @@ test('reduced motion: a building looks the same at any time and ignores hits', (
 test('units: one building unit is UNIT px at scale 1', () => {
   assert.equal(UNIT, 2.2);
 });
+
+test('phone box: double-ring cadence, pure and periodic', async () => {
+  const { phoneRinging } = await import('../buildings.js');
+  assert.equal(phoneRinging(0.2), 1);
+  assert.equal(phoneRinging(0.5), 0, 'gap between the two rings');
+  assert.equal(phoneRinging(0.8), 1);
+  assert.equal(phoneRinging(2), 0, 'pause');
+  for (const t of [0.1, 0.7, 1.7, 2.9]) assert.equal(phoneRinging(t), phoneRinging(t + 3));
+  for (let t = 0; t < 6; t += 0.01) assert.ok(phoneRinging(t) >= 0 && phoneRinging(t) <= 1);
+});
+
+test('phone box: the front of the queue holds the receiver, beside the box door', async () => {
+  const { PHONE_HOLDER_SLOT, phoneSocket, receiverSpot } = await import('../buildings.js');
+  for (const [scale, r] of [[1, 18], [0.7, 12.6]]) {
+    const slots = bellQueueSlots(scale, r);
+    const front = slots[PHONE_HOLDER_SLOT];
+    for (const s of slots.filter((x) => x.side === front.side)) assert.ok(Math.abs(s.dx) >= Math.abs(front.dx), 'holder is nearest the box');
+    const sock = phoneSocket(scale);
+    assert.ok(sock.dx > 0 && sock.dy < 0, 'socket on the door side, up the box');
+    const rs = receiverSpot(r, front.side);
+    const hand = front.dx + rs.dx;
+    assert.ok(Math.abs(hand) < Math.abs(front.dx), 'receiver on the cheek facing the box');
+    assert.ok(Math.abs(hand) > sock.dx, 'the receiver is out past the socket, so the cord runs outward');
+  }
+});
+
+test('phone box keeps the bell footprint, so placement is unchanged', () => {
+  const f = isletFootprint('human', 1);
+  assert.equal(f.rx, 140);
+  assert.equal(f.ry, 32);
+  assert.ok(Math.abs(f.top - (48 * UNIT + 12)) < 1e-9);
+  assert.ok(Math.abs(buildingFootprint('human', 1).w - 44 * UNIT) < 1e-9);
+});
+
+test('phone box under reduced motion: ring arcs show while anyone waits, and hold still', () => {
+  const pal = palFor('light');
+  const arcs = (o, t = 0) => { const r = recordingCtx(); drawServiceBuilding(r.ctx, 'human', 100, 200, 1, pal, t, o); return r.calls.filter((c) => c.startsWith('arc(')); };
+  assert.ok(arcs({ reduced: true, waiting: 1 }).length >= 4, 'arcs while waiting');
+  assert.equal(arcs({ reduced: true, waiting: 0 }).length, 0, 'none when nobody waits');
+  assert.deepEqual(arcs({ reduced: true, waiting: 1 }, 0), arcs({ reduced: true, waiting: 1 }, 7.3), 'no motion');
+});
