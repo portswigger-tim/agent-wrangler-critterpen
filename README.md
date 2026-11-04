@@ -51,6 +51,10 @@ the Jira post office.
 
 Critter Pen deliberately shows no "needs you" counts or badges.
 
+Critter Pen never navigates or changes your view on its own: nothing it sees (a
+finished turn, a session needing you, new activity) opens, selects or scrolls to
+anything. Only clicking a critter opens its session.
+
 ## Install
 
 In Agent Wrangler, open **Settings → Extensions → + Add extension → Git URL** and paste:
