@@ -3,13 +3,16 @@
 
 import { LANDMARK_KINDS, STATUSES, isPenEvent } from './contract.js';
 import { critterTraits, rng, clamp, lerp, ease, springStep, truncateToWidth, quad, quadAngle, arcControl, TAU } from './util.js';
-import { readTheme, toCss, mix, lighten, darken, ensureContrast } from './color.js';
+import { readTheme, toCss, mix, lighten, darken, statusColor } from './color.js';
 import { computeLayout, LANDMARK_LABELS } from './layout.js';
 import { diffCritters } from './diff.js';
 import {
   ACCESSORIES, agentTint, kindColor, drawCritter, drawShadow, drawBubble, drawThinkingDots,
-  drawDizzyStars, drawStar, drawLandmark, drawProjectile, haloText, roundRect, ellipse,
+  drawDizzyStars, drawStar, drawLandmark, drawProjectile, haloText, roundRect, ellipse, drawChatBubble,
 } from './art.js';
+// ── personality hooks ── (behaviour.js / ambient.js / art.js are the character artist's)
+import { createMind, applyBehaviour } from './behaviour.js';
+import { drawAmbient } from './ambient.js';
 
 /** @typedef {import('./contract.js').PenState} PenState */
 /** @typedef {import('./contract.js').PenEvent} PenEvent */
@@ -20,17 +23,8 @@ const FONT_NAME = '600 11px system-ui, -apple-system, Segoe UI, sans-serif';
 const FONT_TASK = '700 10px system-ui, -apple-system, Segoe UI, sans-serif';
 const FONT_FLOAT = '700 11px system-ui, -apple-system, Segoe UI, sans-serif';
 
-/** Body colour for a status in the current palette. */
-export function statusColor(status, pal) {
-  switch (status) {
-    case 'working': return pal.green;
-    case 'thinking': return pal.blue;
-    case 'needs-you': return pal.yellow;
-    case 'error': return pal.red;
-    case 'archived': return ensureContrast(mix(pal['surface-2'], pal.bg, 0.25), pal.bg, 1.3);
-    default: return ensureContrast(pal.dark ? mix(pal['surface-2'], pal.fg, 0.38) : pal['surface-2'], pal.bg, pal.dark ? 2.2 : 1.45);
-  }
-}
+/** Body colour for a status in the current palette (pastel-tuned; lives in color.js). */
+export { statusColor };
 
 /**
  * Mount a pen into `el` (which must have a size; the canvas fills it).
@@ -67,6 +61,7 @@ export function createPen(el, opts = {}) {
   const pendingBaby = new Map(); // parentId → { x, y, at }
   let time = 0, lastTs = 0, raf = 0, destroyed = false, firstState = true, needsLayout = true;
   let hovered = null, labelWidth = 70;
+  let pointer = null, frameDt = 1 / 60; // ── personality hooks ──
 
   // ── sprites ────────────────────────────────────────────────────────────────
 
@@ -93,6 +88,8 @@ export function createPen(el, opts = {}) {
       visit: null, hopP: 0, smokeT: rand() * 2, zT: rand() * 2,
       label: null, labelFor: '',
       cx: 0, cy: 0, cr: 0, flip: false, spin: 0,
+      // ── personality hooks ──
+      mind: createMind(seed), gaze: { x: 0, y: 0 }, attn: null,
     };
   }
 
@@ -126,6 +123,12 @@ export function createPen(el, opts = {}) {
         const parent = sprites.get(c.parentId);
         s.enterFrom = baby && time - baby.at < 4 ? { x: baby.x, y: baby.y, landed: true } : { x: parent.cx, y: parent.cy + parent.cr };
         pendingBaby.delete(c.parentId);
+        // ── personality hooks ── family and islandmates wave hello once it lands.
+        let n = 0;
+        for (const o of sprites.values()) {
+          if (n >= 5 || o.life !== 'live' || (o.data.parentId !== c.parentId && o.id !== c.parentId && o.data.taskId !== c.taskId)) continue;
+          o.mind.trigger('wave', time, { delay: 0.7 + n++ * 0.18, targetId: c.id });
+        }
       }
       if (c.status === 'archived') s.life = 'gone'; // never seen alive; don't draw
       sprites.set(c.id, s);
@@ -192,7 +195,7 @@ export function createPen(el, opts = {}) {
   let statusCache = null;
   function colorOf(status) {
     if (!statusCache) statusCache = Object.fromEntries(STATUSES.map((k) => [k, statusColor(k, pal)]));
-    return statusCache[status] || statusCache.idle;
+    return statusCache[status] || (statusCache[status] = statusColor(status, pal));
   }
   function setPalette(p) { pal = p; statusCache = null; }
 
@@ -229,6 +232,7 @@ export function createPen(el, opts = {}) {
     if (!alive) return;
     if (ev.kind === 'done') {
       s.celebrateAge = 0;
+      s.mind.trigger('wiggle', time, { delay: 1.5 }); // ── personality hooks ──
       if (reduced) flash(s, pal.accent, 1.6);
       else burst(s.cx, s.cy - s.cr, 'confetti', 28);
       if (ev.label) floatText(ev.label, s.cx, s.cy - s.cr * 2.4, pal.green, -1);
@@ -350,6 +354,7 @@ export function createPen(el, opts = {}) {
 
   function update(dt) {
     time += dt;
+    frameDt = dt;
     if (needsLayout) relayout();
 
     for (const s of sprites.values()) {
@@ -434,7 +439,7 @@ export function createPen(el, opts = {}) {
       } else if (s.status === 'error') {
         s.smokeT -= dt;
         if (s.smokeT <= 0) { puff(s.cx + (s.rand() - 0.5) * r * 0.6, s.cy - r * 1.9, 'smoke'); s.smokeT = 0.9 + s.rand() * 0.6; }
-      } else if (s.status === 'idle') {
+      } else if (s.status === 'asleep') {
         s.zT -= dt;
         if (s.zT <= 0) {
           addParticle({ type: 'z', x: s.cx + r * 0.6, y: s.cy - r * 1.2, vx: 9, vy: -14, life: 2.4, size: clamp(r * 0.6, 9, 15), drag: 1, phase: s.rand() * TAU });
@@ -477,16 +482,33 @@ export function createPen(el, opts = {}) {
 
   // ── poses ──────────────────────────────────────────────────────────────────
 
-  const REST = { dx: 0, dy: 0, sx: 1, sy: 1, rot: 0, glow: 0, lift: 0, feetDrop: 0, lookX: 0, lookY: 0 };
+  const REST = { dx: 0, dy: 0, sx: 1, sy: 1, rot: 0, glow: 0, lift: 0, feetDrop: 0, lookX: 0, lookY: 0, lidTop: 0, lidBot: 0, lidTilt: 0 };
+  // Lids per status: focused while working, pondering while thinking, wide when it needs you.
+  const FOCUSED = { lidTop: 0.1, lidBot: 0.24, lidTilt: 0.03 };
+  const PONDER = { lidTop: 0, lidBot: 0.08 };
+  const RELAXED = { lidTop: 0, lidBot: 0.2, mouth: 'smile' };
+  const SITTING = { sx: 1.06, sy: 0.93, feetDrop: -0.15, lookY: 0.15 };
+
+  /** Idle critters doze: mostly asleep, now and then a heavy-lidded peek that droops shut. */
+  function dozeLid(t) {
+    const q = (t / 9) % 1;
+    if (q < 0.58) return 1;
+    if (q < 0.63) return lerp(1, 0.42, ease.outQuad((q - 0.58) / 0.05));
+    if (q < 0.9) return lerp(0.42, 0.8, (q - 0.63) / 0.27);
+    return lerp(0.8, 1, (q - 0.9) / 0.1);
+  }
 
   function statusPose(s, status, r) {
     const t = time + s.phase;
     if (reduced) {
       const base = { ...REST, eyes: 'open', mouth: 'smile', wave: null };
-      if (status === 'idle') return { ...base, eyes: 'closed', mouth: 'small-o' };
+      if (status === 'asleep') return { ...base, lidTop: 1, mouth: 'small-o' };
+      if (status === 'idle') return { ...base, ...RELAXED };
+      if (status === 'finished') return { ...base, ...SITTING, lidTop: 0.08, mouth: 'smile' };
       if (status === 'needs-you') return { ...base, eyes: 'wide', mouth: 'o', glow: 0.7, wave: -0.9 };
       if (status === 'error') return { ...base, eyes: 'spiral', mouth: 'wavy' };
-      if (status === 'thinking') return { ...base, mouth: 'flat', lookX: 0.4, lookY: -0.8 };
+      if (status === 'thinking') return { ...base, ...PONDER, mouth: 'hmm', lookX: 0.4, lookY: -0.8 };
+      if (status === 'working') return { ...base, ...FOCUSED, mouth: 'cat' };
       if (status === 'archived') return { ...base, eyes: 'happy', wave: -0.9 };
       return base;
     }
@@ -498,14 +520,14 @@ export function createPen(el, opts = {}) {
         if (p < 0.75) {
           const q = p / 0.75, h = 4 * q * (1 - q), vel = 1 - 2 * q;
           const st = 0.13 * Math.abs(vel);
-          return { ...REST, dx: drift, dy: -h * r * 0.75, sx: 1 - st * 0.6, sy: 1 + st, lift: h, feetDrop: h * 0.7, lookX: Math.cos(t * 0.9) * 0.6, eyes: 'open', mouth: 'smile', wave: null };
+          return { ...REST, ...FOCUSED, dx: drift, dy: -h * r * 0.75, sx: 1 - st * 0.6, sy: 1 + st, lift: h, feetDrop: h * 0.7, lookX: Math.cos(t * 0.9) * 0.6, eyes: 'open', mouth: 'cat', wave: null };
         }
         const q = (p - 0.75) / 0.25, sq = Math.sin(Math.PI * q) * 0.2;
-        return { ...REST, dx: drift, sx: 1 + sq * 0.8, sy: 1 - sq, lookX: Math.cos(t * 0.9) * 0.6, eyes: 'open', mouth: 'smile', wave: null };
+        return { ...REST, ...FOCUSED, dx: drift, sx: 1 + sq * 0.8, sy: 1 - sq, lookX: Math.cos(t * 0.9) * 0.6, eyes: 'open', mouth: 'cat', wave: null };
       }
       case 'thinking': {
         const b = Math.sin(t * 1.4);
-        return { ...REST, dy: -(b * 0.5 + 0.5) * r * 0.2, sx: 1 + b * 0.02, sy: 1 - b * 0.02, rot: Math.sin(t * 0.7) * 0.06, lift: 0.15 * (b * 0.5 + 0.5), lookX: 0.45 + Math.sin(t * 0.5) * 0.3, lookY: -0.9, eyes: 'open', mouth: 'flat', wave: null };
+        return { ...REST, ...PONDER, dy: -(b * 0.5 + 0.5) * r * 0.2, sx: 1 + b * 0.02, sy: 1 - b * 0.02, rot: Math.sin(t * 0.7) * 0.06, lift: 0.15 * (b * 0.5 + 0.5), lookX: 0.45 + Math.sin(t * 0.5) * 0.3, lookY: -0.9, eyes: 'open', mouth: 'hmm', wave: null };
       }
       case 'needs-you': {
         const q = (t % 1.3) / 1.3;
@@ -522,17 +544,27 @@ export function createPen(el, opts = {}) {
       }
       case 'archived':
         return { ...REST, eyes: 'happy', mouth: 'smile', wave: -0.4 + Math.sin(t * 9) * 0.7 };
+      case 'asleep': {
+        const b = Math.sin(t * 1.1);
+        return { ...REST, sx: 1 - 0.035 * b, sy: 1 + 0.045 * b, eyes: 'open', lidTop: dozeLid(t), lidBot: 0.1, mouth: 'small-o', wave: null };
+      }
+      case 'finished': {
+        // Sitting, calm, looking out at you with a result: a slow breath and a gentle sway.
+        const b = Math.sin(t * 1.3);
+        return { ...REST, ...SITTING, sx: SITTING.sx - 0.02 * b, sy: SITTING.sy + 0.025 * b, rot: Math.sin(t * 0.8) * 0.035, eyes: 'open', lidTop: 0.08, mouth: 'smile', wave: null };
+      }
       case 'idle':
       default: {
+        // Awake and relaxed at the prompt: easy breathing, soft lids.
         const b = Math.sin(t * 1.1);
-        return { ...REST, sx: 1 - 0.035 * b, sy: 1 + 0.045 * b, eyes: 'closed', mouth: 'small-o', wave: null };
+        return { ...REST, ...RELAXED, sx: 1 - 0.025 * b, sy: 1 + 0.03 * b, eyes: 'open', wave: null };
       }
     }
   }
 
   function blendPose(a, b, w) {
     const o = { ...b };
-    for (const k of ['dx', 'dy', 'sx', 'sy', 'rot', 'glow', 'lift', 'feetDrop', 'lookX', 'lookY']) o[k] = lerp(a[k] || 0, b[k] || 0, w);
+    for (const k of ['dx', 'dy', 'sx', 'sy', 'rot', 'glow', 'lift', 'feetDrop', 'lookX', 'lookY', 'lidTop', 'lidBot', 'lidTilt']) o[k] = lerp(a[k] || 0, b[k] || 0, w);
     if (w < 0.5) { o.eyes = a.eyes; o.mouth = a.mouth; o.wave = a.wave; }
     return o;
   }
@@ -544,7 +576,28 @@ export function createPen(el, opts = {}) {
     if (reduced) {
       if (s.flashAge < (s.flashDur || 1)) { pose.glow = Math.max(pose.glow, 1 - s.flashAge / (s.flashDur || 1)); pose.glowColor = s.flashColor; }
       if (s.celebrateAge < 1.6) { pose.eyes = 'happy'; pose.mouth = 'grin'; }
-      return pose;
+      return glance(s, pose, r);
+    }
+
+    // ── personality hooks ── rare idle behaviours, layered over the status pose.
+    if (s.life === 'live' && !s.visit) {
+      const b = s.mind.at(time, { status: s.status, reduced, neighbours: neighboursOf(s) });
+      const t = b?.target && sprites.get(b.target);
+      const dir = t ? unit(t.cx - s.cx, t.cy - s.cy) : null;
+      pose = applyBehaviour(pose, b, r, dir);
+      if (b?.kind === 'chat' && t) t.attn = { id: s.id, until: time + 0.25 }; // the friend looks back
+      else if (!b && s.attn && time < s.attn.until) {
+        const c = sprites.get(s.attn.id);
+        if (c) { const d = unit(c.cx - s.cx, c.cy - s.cy); pose.lookX = d.x; pose.lookY = clamp(d.y, -0.5, 0.5); pose.lidTop = Math.min(pose.lidTop || 0, 0.3); }
+      } else if (!b && s.status === 'thinking') {
+        // Busy elsewhere: every few seconds, check on a working child.
+        const q = ((time + s.phase * 2) / 6) % 1;
+        const kid = q < 0.3 && [...sprites.values()].find((k) => k.data.parentId === s.id && k.status === 'working' && k.life === 'live');
+        if (kid) {
+          const d = unit(kid.cx - s.cx, kid.cy - s.cy), w = Math.sin(Math.PI * q / 0.3);
+          pose.lookX = lerp(pose.lookX, d.x, w); pose.lookY = lerp(pose.lookY, clamp(d.y, -0.5, 0.5), w);
+        }
+      }
     }
 
     // Walking waddle whenever the critter is travelling.
@@ -596,7 +649,35 @@ export function createPen(el, opts = {}) {
       const dx = s.lookAt.x - s.cx, dy = s.lookAt.y - s.cy, d = Math.hypot(dx, dy) || 1;
       pose.lookX = dx / d; pose.lookY = dy / d;
       if (pose.eyes === 'closed') pose.eyes = 'open';
+      pose.lidTop = Math.min(pose.lidTop || 0, 0.3);
     }
+    return glance(s, pose, r);
+  }
+
+  // ── personality hooks ── eyes: glance at a nearby cursor, then ease the gaze.
+  const unit = (dx, dy) => { const d = Math.hypot(dx, dy) || 1; return { x: dx / d, y: dy / d }; };
+  function neighboursOf(s) {
+    const out = [];
+    for (const o of sprites.values()) {
+      if (o !== s && o.life === 'live' && o.age >= 0 && o.data.taskId === s.data.taskId) out.push(o.id);
+    }
+    return out;
+  }
+  function glance(s, pose, r) {
+    const busyLooking = s.lookAt && time < s.lookUntil;
+    if (pointer && !busyLooking && s.life === 'live' && pose.eyes !== 'spiral') {
+      const dx = pointer.x - s.cx, dy = pointer.y - s.cy, d = Math.hypot(dx, dy);
+      if (d < Math.max(90, r * 5) && d > r * 0.6) {
+        pose.lookX = dx / d; pose.lookY = clamp(dy / d, -0.8, 0.8);
+        if (pose.eyes === 'closed') pose.eyes = 'open';
+        pose.lidTop = Math.min(pose.lidTop || 0, s.status === 'asleep' ? 0.45 : 0.15);
+      }
+    }
+    // Reduced motion: glances are instant. Otherwise the eyes travel quickly.
+    const k = reduced ? 1 : 1 - Math.exp(-frameDt * 14);
+    s.gaze.x += ((pose.lookX || 0) - s.gaze.x) * k;
+    s.gaze.y += ((pose.lookY || 0) - s.gaze.y) * k;
+    pose.lookX = s.gaze.x; pose.lookY = s.gaze.y;
     return pose;
   }
 
@@ -638,6 +719,9 @@ export function createPen(el, opts = {}) {
       ctx.fill();
       ctx.restore();
     }
+
+    // ── personality hooks ── fireflies / petals, behind everything that moves.
+    drawAmbient(ctx, { W, H, pal, time, reduced, areas: layout.islands });
 
     // Landmarks.
     const needsYou = [...sprites.values()].filter((s) => s.status === 'needs-you' && s.life !== 'leave').length;
@@ -700,6 +784,7 @@ export function createPen(el, opts = {}) {
         x: s.x.x + pose.dx, y: groundY + pose.dy, r,
         sx: pose.sx, sy: pose.sy, rot: pose.rot, color, alpha: s.alpha,
         eyes: pose.eyes, mouth: pose.mouth, blink, wave: pose.wave,
+        lidTop: pose.lidTop, lidBot: pose.lidBot, lidTilt: pose.lidTilt, mouthOpen: pose.mouthOpen, armsUp: pose.armsUp,
         lookX: pose.lookX, lookY: pose.lookY, feetDrop: pose.feetDrop, feetStep: pose.feetStep || 0,
         glow: hovered === s.id ? Math.max(pose.glow, 0.6) : pose.glow,
         glowColor: hovered === s.id ? pal.accent : pose.glowColor,
@@ -721,9 +806,13 @@ export function createPen(el, opts = {}) {
           drawThinkingDots(ctx, s.cx, s.cy - r * 1.45 - (s.accessory === 'none' ? 0 : r * 0.55), r * st, reduced ? 0.6 : time + s.phase, mix(pal.blue, pal.fg, 0.35));
         } else if (s.status === 'error') {
           drawDizzyStars(ctx, s.cx, s.cy - r * 1.3 - (s.accessory === 'none' ? 0 : r * 0.5), r * st, time + s.phase, pal.yellow, reduced);
-        } else if (s.status === 'idle' && reduced) {
+        } else if (s.status === 'finished') {
+          const bob = reduced ? 0 : Math.sin(time * 2.2 + s.phase) * 1.5;
+          drawBubble(ctx, s.cx + r * 0.75, headY - r * 0.35 + bob, '✓', pal, pal.accent, clamp(r / 18, 0.6, 1.1) * st * 0.9);
+        } else if (s.status === 'asleep' && reduced) {
           haloText(ctx, 'z', s.cx + r * 0.9, s.cy - r * 1.2, pal, 0.7, `700 ${Math.round(clamp(r * 0.55, 8, 13))}px system-ui, sans-serif`, mix(pal.fg, pal.blue, 0.4));
         }
+        if (pose.bubble) drawChatBubble(ctx, s.cx, headY - r * 0.1, pose.bubble, pal, r); // ── personality hooks ──
       }
       ctx.restore();
 
@@ -736,7 +825,7 @@ export function createPen(el, opts = {}) {
       }
       if (!layout.compact && hovered !== s.id) {
         const near = hoverSprite && Math.abs(hoverSprite.y.x - groundY) < 30 && Math.abs(hoverSprite.x.x - s.x.x) < labelWidth * 1.5;
-        haloText(ctx, s.label, s.x.x, groundY + 10, pal, (s.status === 'idle' ? 0.6 : 0.85) * a * (near ? 0.2 : 1), FONT_NAME);
+        haloText(ctx, s.label, s.x.x, groundY + 10, pal, (s.status === 'asleep' ? 0.6 : 0.85) * a * (near ? 0.2 : 1), FONT_NAME);
       }
     }
 
@@ -910,11 +999,13 @@ export function createPen(el, opts = {}) {
     return best;
   }
   const onMove = (ev) => {
+    const rect = canvas.getBoundingClientRect();
+    pointer = { x: ev.clientX - rect.left, y: ev.clientY - rect.top }; // ── personality hooks ──
     const s = pick(ev);
     hovered = s ? s.id : null;
     canvas.style.cursor = s ? 'pointer' : '';
   };
-  const onLeave = () => { hovered = null; canvas.style.cursor = ''; };
+  const onLeave = () => { hovered = null; pointer = null; canvas.style.cursor = ''; };
   const onClick = (ev) => {
     const s = pick(ev);
     if (!s) return;
