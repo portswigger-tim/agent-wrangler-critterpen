@@ -18,12 +18,12 @@ export function hsl(h, s, l) {
   return { r: f(0) * 255, g: f(8) * 255, b: f(4) * 255, a: 1 };
 }
 
-/** Tint for eyes/accessory by agent type (Claude warm, Codex teal, others by hash). */
-export function agentTint(agent, seed) {
+/** Tint for eyes/accessory by agent type (Claude warm, Codex teal, others by `hue`). */
+export function agentTint(agent, hue) {
   const a = String(agent || '').toLowerCase();
   if (a.includes('claude')) return parseColor('#d97757');
   if (a.includes('codex')) return parseColor('#22a699');
-  return hsl(seed % 360, 0.55, 0.55);
+  return hsl(hue % 360, 0.55, 0.55);
 }
 
 /** Projectile / ring colour per event kind. */

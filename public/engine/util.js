@@ -11,11 +11,34 @@ export function hash32(str) {
     h ^= str.charCodeAt(i);
     h = Math.imul(h, 0x01000193);
   }
-  // Final avalanche so short ids that differ by one char still spread well.
+  // MurmurHash3 fmix32 avalanche so ids that differ in one char (or share a
+  // long prefix, like UUIDs from one machine) still spread across every bit.
   h ^= h >>> 16;
   h = Math.imul(h, 0x85ebca6b);
   h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35);
+  h ^= h >>> 16;
   return h >>> 0;
+}
+
+/**
+ * Stable per-critter looks derived from its id. Each trait is its own draw
+ * from a seeded PRNG, so sharing one (say the same hat) says nothing about
+ * the others (tint, hop rhythm, size).
+ * @param {string} id
+ * @param {number} accessoryCount
+ */
+export function critterTraits(id, accessoryCount) {
+  const seed = hash32(id);
+  const r = rng(seed);
+  return {
+    seed,
+    accessory: Math.floor(r() * accessoryCount),
+    hue: Math.floor(r() * 360),
+    hop: Math.floor(r() * 7),
+    phase: r() * 10,
+    size: 0.92 + r() * 0.16,
+  };
 }
 
 /**
