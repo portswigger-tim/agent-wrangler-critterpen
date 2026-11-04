@@ -288,6 +288,7 @@ export function createPen(el, opts = {}) {
   function floatText(text, x, y, color, dir) {
     // Stack behind any label still rising from the same spot.
     const busy = floaters.filter((f) => Math.abs(f.x - x) < 40 && Math.abs(f.y0 - y) < 40 && f.age < 0.9).length;
+    if (busy >= 3) return; // a burst of hits: the pulse says enough
     floaters.push({ text: String(text).slice(0, 40), x, y: y + dir * busy * 22, y0: y, dir, color, age: 0, dur: 1.9 });
     if (floaters.length > 24) floaters.shift();
   }
