@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Service buildings</title>
+<style>
+  [data-theme="dark"] {
+    --bg: #12151b; --surface-2: #3a414b; --fg: #e6edf3;
+    --green: #56d364; --blue: #6ca7ff; --yellow: #f5c542; --red: #ff6b6b; --accent: #bc8cff;
+  }
+  [data-theme="light"] {
+    --bg: #f4f1ea; --surface-2: #cfd3da; --fg: #23262d;
+    --green: #2fa84f; --blue: #3b7ddd; --yellow: #e9a514; --red: #e5484d; --accent: #8e5bd8;
+  }
+  html, body { margin: 0; height: 100%; font: 13px system-ui, sans-serif; }
+  body { display: grid; grid-template-rows: 1fr 1fr; }
+  .panel { position: relative; background: var(--bg); color: var(--fg); }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<!-- Art reference for buildings.js: every service building in both themes,
+     bare (top row) and on their islets (bottom row).
+     ?t=seconds freezes time · ?hit=0..1 freezes every building's hit value
+     · ?waiting=0 turns off the bell's glow · ?scale=0.8 -->
+<div class="panel" data-theme="dark"><canvas></canvas></div>
+<div class="panel" data-theme="light"><canvas></canvas></div>
+<script type="module">
+import { ISLET_KINDS, drawServiceBuilding, drawCaptionPlank, drawIslet } from './buildings.js';
+import { readTheme } from './color.js';
+import { drawSky } from './ambient.js';
+import { haloText } from './art.js';
+
+const q = new URLSearchParams(location.search);
+const frozen = q.has('t') ? +q.get('t') : null;
+const fixedHit = q.has('hit') ? +q.get('hit') : null;
+const waiting = q.has('waiting') ? +q.get('waiting') : 1;
+const S = +(q.get('scale') || 0.62);
+const CAPTION = { git: 'git', pr: 'PRs', jira: 'Jira', terminal: 'shell', web: 'web', files: 'files', human: 'you' };
+
+const panels = [...document.querySelectorAll('.panel')].map((el) => ({ el, canvas: el.querySelector('canvas') }));
+
+function frame(ms) {
+  const t = frozen ?? ms / 1000;
+  for (const { el, canvas } of panels) {
+    const ctx = canvas.getContext('2d');
+    const dpr = devicePixelRatio || 1, W = canvas.clientWidth, H = canvas.clientHeight;
+    if (canvas.width !== W * dpr) { canvas.width = W * dpr; canvas.height = H * dpr; }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const pal = readTheme(el, 'auto');
+    drawSky(ctx, { W, H, pal, time: t, reduced: false });
+    const gap = W / ISLET_KINDS.length;
+    ISLET_KINDS.forEach((kind, i) => {
+      // Each building gets hit every 3.5s, staggered, so every animation shows.
+      const since = (t + i * 0.5) % 3.5;
+      const hit = fixedHit ?? Math.max(0, 1 - since / 1.4);
+      const x = gap * (i + 0.5);
+      drawServiceBuilding(ctx, kind, x, H * 0.36, S, pal, t, { hit, waiting });
+      drawCaptionPlank(ctx, x, H * 0.36 + 8, CAPTION[kind], pal, 1);
+      drawIslet(ctx, kind, x, H * 0.8, S * 0.8, pal, t, { hit, waiting, caption: undefined });
+    });
+    haloText(ctx, el.dataset.theme, 30, 14, pal, 0.5);
+  }
+  if (frozen == null) requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
