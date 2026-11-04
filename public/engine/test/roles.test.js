@@ -80,3 +80,10 @@ test('bodies never touch at rest, whatever the family shape (reduced motion uses
   assert.ok(PERSONAL_SPACE / 2 >= 1.08 * 1.08, 'personal space covers jitter + squash');
   assert.ok(islandAxes({ rx: 100, ry: 40 }, 10).ax > 0);
 });
+
+test('a family island has room: the parent is well inside, not on the rim', () => {
+  const critters = [crit('cart', 'co'), crit('ci', 'co', 'cart'), crit('pay', 'co')];
+  const L = computeLayout({ width: 1200, height: 760, critters });
+  const sp = L.spots.get('cart');
+  assert.ok(Math.hypot(sp.u, sp.v) < 0.6, `parent at |uv|=${Math.hypot(sp.u, sp.v).toFixed(2)}`);
+});

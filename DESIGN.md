@@ -62,11 +62,14 @@ hit target scales with size, so parents are the easiest to click. Islands are si
 the room their crowd needs (Σ scale²).
 
 **Name labels** (`labels.js`) drop a leading copy of the task name (matched loosely)
-and cut long names in the middle. They are placed above everything in priority order
+and shorten long names from the middle by whole words, keeping the first and last
+(`util.truncateMiddle`; a single long word is cut inside). They are placed above
+everything in priority order
 (needs-you > finished > working > thinking > error > idle > asleep; parents first among
 equals, in bolder type; then front-most), each trying under the feet, a line lower,
-sideways or above the head, avoiding building captions and name planks; a label with no
-clear spot fades to a whisper.
+sideways or just over the head (clearing a hat or bubble, up to 22px), avoiding every
+critter's body, building captions and name planks; a label with no clear spot fades to
+a whisper. Name planks are drawn over flying debris.
 
 **Leashes** are a little rope (about 2.4px, earthy: light tan on dark themes, dark brown
 on light, over a contrasting halo) from parent to child, drawn above the islands and

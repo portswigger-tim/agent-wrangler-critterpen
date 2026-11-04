@@ -67,12 +67,16 @@ test('a label placed above the head clears the headroom of a hat or bubble', () 
   const measure = (t) => t.length * 7;
   const base = { id: 'q', text: 'Write API reference', x: 500, groundY: 700, r: 18, status: 'needs-you', above: true };
   const [plain] = placeLabels([base], measure);
-  const [raised] = placeLabels([{ ...base, headroom: 30 }], measure);
-  assert.equal(plain.y - raised.y, 30);
-  assert.ok(raised.box.b < 700 - 18 * 2 - 30, 'label bottom sits above head + headroom');
+  const [raised] = placeLabels([{ ...base, headroom: 20 }], measure);
+  assert.equal(plain.y - raised.y, 20);
+  assert.ok(raised.box.b < 700 - 18 * 2 - 20, 'label bottom sits above head + headroom');
+  // ...but never drifts far above: tall headroom is capped.
+  const [tall] = placeLabels([{ ...base, headroom: 60 }], measure);
+  assert.equal(plain.y - tall.y, MAX_HEADROOM);
+  assert.ok(700 - 18 * 2 - tall.box.b <= MAX_HEADROOM + 4, 'sits close over the head');
 });
 
-import { stripTaskPrefix } from '../labels.js';
+import { stripTaskPrefix, MAX_HEADROOM } from '../labels.js';
 import { truncateMiddle } from '../util.js';
 
 test('labels drop a leading copy of the task name, loosely matched', () => {
@@ -99,4 +103,36 @@ test('middle ellipsis keeps the distinguishing tail', () => {
   assert.ok(a.endsWith('fix') && b.endsWith('mitmproxy'));
   assert.equal(truncateMiddle('short', 100, m), 'short');
   assert.equal(truncateMiddle('anything', 2, m), '');
+});
+
+test('middle ellipsis drops whole words before cutting inside one', () => {
+  const m = (t) => t.length * 7;
+  assert.equal(truncateMiddle('Critter cuteness pass', 105, m), 'Critter … pass');
+  assert.equal(truncateMiddle('Fix flaky payment tests', 105, m), 'Fix … tests');
+  assert.equal(truncateMiddle('Migrate docs to Astro', 105, m), 'Migrate … Astro');
+  // Two whole words don't fit: keep the last whole, shorten the first.
+  assert.equal(truncateMiddle('Investigate CI timeouts', 105, m), 'Inves… timeouts');
+  // A single long word: character cut, both ends kept.
+  const one = truncateMiddle('Safer-runner-action', 105, m);
+  assert.ok(m(one) <= 105 && one.includes('…') && one.startsWith('Safer') && one.endsWith('action'));
+  // Grows from the tail first when there is room for more words.
+  assert.equal(truncateMiddle('Write the API reference for search', 210, m), 'Write … reference for search');
+});
+
+test('names never sit on another critter\'s body', () => {
+  // A critter standing right where its neighbour's label would go.
+  const items = [
+    { id: 'back', text: 'Investigate CI timeouts', x: 200, groundY: 200, r: 20, status: 'working' },
+    { id: 'front', text: 'Refactor cart service', x: 205, groundY: 250, r: 20, status: 'working' },
+  ];
+  const placed = placeLabels(items, (t) => t.length * 7);
+  const body = (it) => ({ l: it.x - it.r, r: it.x + it.r, t: it.groundY - 2 * it.r, b: it.groundY });
+  for (const p of placed.filter((q) => q.visible)) {
+    for (const it of items) {
+      if (it.id === p.id) continue;
+      const b = body(it);
+      assert.ok(!(p.box.l < b.r && p.box.r > b.l && p.box.t < b.b && p.box.b > b.t), `${p.id}'s name covers ${it.id}`);
+    }
+  }
+  assert.ok(placed.every((p) => p.visible), 'both still find a spot');
 });

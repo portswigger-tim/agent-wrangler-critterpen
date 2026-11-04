@@ -35,8 +35,9 @@ the Jira post office.
   islands too.
 - **Names:** each critter's name sits under it, without the task name the island's
   plank already shows ("Safer-runner-action L7 mitmproxy" on the Safer Runner island
-  reads "L7 mitmproxy"), and long names are cut in the middle so the end survives.
-  When critters crowd together the names never overlap: the critters that need you
+  reads "L7 mitmproxy"), and long names lose whole words from the middle so the first
+  and last survive ("Investigate … timeouts"). Names never sit on another critter, and
+  when critters crowd together the names never overlap: the critters that need you
   keep theirs in place (parents first among equals, in bolder type), others shift
   aside or above their heads, and a name with no room left fades to a whisper.
   Critters waiting at the bell show their name above their heads. Hover a critter for

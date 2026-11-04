@@ -407,7 +407,7 @@ export function createPen(el, opts = {}) {
       if (!s.wander || s.life !== 'live' || s.place !== 'island' || s.hop) continue;
       if (!byIsland.has(s.home.taskId)) byIsland.set(s.home.taskId, []);
       s.wander.rad = s.r.x; // bigger critters keep more room
-      s.wander.m = s.role === 'parent' ? 0.15 : 1; // and parents hold their ground
+      s.wander.m = s.role === 'parent' ? 0.05 : 1; // and parents hold their ground
       byIsland.get(s.home.taskId).push(s.wander);
     }
     for (const [id, list] of byIsland) {
@@ -845,7 +845,6 @@ export function createPen(el, opts = {}) {
       const isles = [...islandViz.values()].sort((a, b) => a.cy - b.cy);
       for (const v of isles) {
         drawIsland(ctx, v, pal, { bob: v.bob, alpha: v.a });
-        drawSignpost(ctx, v.cx, v.cy + v.bob + v.ry * 1.3 + 4, v.taskName, pal, { scale: clamp(layout.radius / 18, 0.8, 1.15), alpha: v.a, hang: true });
       }
     }
 
@@ -979,7 +978,7 @@ export function createPen(el, opts = {}) {
       }
       if (!layout.compact && hovered !== s.id) {
         const near = hoverSprite && Math.abs(hoverSprite.y.x - groundY) < 30 && Math.abs(hoverSprite.x.x - s.x.x) < labelWidth * 1.5;
-        labels.push({ id: s.id, text: s.label, x: s.x.x, groundY, r, status: s.status, above: s.place === 'bell', parent: s.role === 'parent', font, headroom: headroomOf(s, r), alpha: (s.status === 'asleep' ? 0.6 : 0.85) * a * (near ? 0.2 : 1) });
+        labels.push({ id: s.id, text: s.label, x: s.x.x, groundY, r, status: s.status, above: s.place === 'bell', parent: s.role === 'parent', font, body: { cx: s.cx, cy: s.cy, cr: s.cr }, headroom: headroomOf(s, r), alpha: (s.status === 'asleep' ? 0.6 : 0.85) * a * (near ? 0.2 : 1) });
       }
     }
 
@@ -1043,6 +1042,13 @@ export function createPen(el, opts = {}) {
       } else {
         const pop = k < 0.12 ? ease.outBack(k / 0.12) : 1;
         drawProjectile(ctx, p.kind, pos.x, pos.y, quadAngle(p.p0, p.p1, p.p2, tk), p.age, pal, pop * clamp(layout.radius / 16, 0.75, 1.25));
+      }
+    }
+
+    // ── islands / wander ── name planks over the debris, so a flurry of paper never hides them.
+    if (layout.mainland) {
+      for (const v of islandViz.values()) {
+        drawSignpost(ctx, v.cx, v.cy + v.bob + v.ry * 1.3 + 4, v.taskName, pal, { scale: clamp(layout.radius / 18, 0.8, 1.15), alpha: v.a, hang: true });
       }
     }
 

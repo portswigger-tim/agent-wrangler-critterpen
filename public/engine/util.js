@@ -120,7 +120,9 @@ export function truncateToWidth(text, maxWidth, measure) {
 
 /**
  * Like truncateToWidth, but cuts from the middle so both ends survive: the
- * tail of a session name is often what tells two apart.
+ * tail of a session name is often what tells two apart. Whole words are
+ * dropped from the middle, keeping the first and last ("Investigate … timeouts");
+ * only a name that can't keep two whole words is cut inside a word.
  * @param {string} text
  * @param {number} maxWidth
  * @param {(s: string) => number} measure
@@ -129,6 +131,27 @@ export function truncateMiddle(text, maxWidth, measure) {
   if (measure(text) <= maxWidth) return text;
   const ell = '…';
   if (measure(ell) > maxWidth) return '';
+  const words = text.trim().split(/\s+/);
+  const last = words[words.length - 1];
+  if (words.length >= 3) {
+    const join = (h, t) => `${words.slice(0, h).join(' ')} ${ell} ${words.slice(words.length - t).join(' ')}`;
+    if (measure(join(1, 1)) <= maxWidth) {
+      let head = 1, tail = 1;
+      // Grow from the tail first (it tells sessions apart), always dropping at least one word.
+      for (;;) {
+        if (head + tail + 1 < words.length && measure(join(head, tail + 1)) <= maxWidth) tail++;
+        else if (head + tail + 1 < words.length && measure(join(head + 1, tail)) <= maxWidth) head++;
+        else break;
+      }
+      return join(head, tail);
+    }
+  }
+  // Still too long: keep the last word whole and shorten the first ("Inves… timeouts").
+  if (words.length >= 2 && measure(`${words[0][0]}${ell} ${last}`) <= maxWidth) {
+    let n = words[0].length - 1;
+    while (n > 1 && measure(`${words[0].slice(0, n)}${ell} ${last}`) > maxWidth) n--;
+    return `${words[0].slice(0, n)}${ell} ${last}`;
+  }
   const fit = (n) => {
     const head = Math.ceil(n * 0.4), tail = n - head;
     return text.slice(0, head).trimEnd() + ell + (tail ? text.slice(text.length - tail).trimStart() : '');
