@@ -11,7 +11,8 @@ import { createPen } from './pen.js';
 
 const pen = createPen(el, {
   theme: 'auto',            // reads --green/--blue/--yellow/--red/--surface-2/--fg/--bg/--accent from el
-  reducedMotion: undefined, // default: follows prefers-reduced-motion
+  reducedMotion: undefined, // initial mode; default follows prefers-reduced-motion,
+                            // and later OS changes always apply (no need to pass a snapshot)
   onCritterClick: (id) => {},  // optional; el also dispatches a bubbling 'critter-click' CustomEvent
 });
 pen.setState({ critters: [...] }); // call every tick; cheap and idempotent when nothing changed
