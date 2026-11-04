@@ -4,13 +4,14 @@
 /** Who gets first pick of a clear spot: the critters you most need to read. */
 export const LABEL_PRIORITY = ['needs-you', 'finished', 'working', 'thinking', 'error', 'idle', 'asleep', 'archived'];
 
-const LABEL_H = 14;
+const LABEL_H = 16; // line box for the 12px name font in pen.js (FONT_NAME)
 const overlaps = (a, b) => a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
 
 /**
  * Candidate label centres for a critter standing at (x, groundY) with radius r:
- * under its feet, a little lower, nudged sideways, and above its head. Queuers
- * at the bell try above first, so they don't sit on the building captions.
+ * under its feet, a little lower, nudged sideways, and above its head (clear of
+ * `headroom` px of hat or bubble). Queuers at the bell try above first, so they
+ * don't sit on the building captions.
  */
 function candidates(it, w) {
   const below = [
@@ -19,12 +20,12 @@ function candidates(it, w) {
     { x: it.x - w * 0.35, y: it.groundY + 10 },
     { x: it.x + w * 0.35, y: it.groundY + 10 },
   ];
-  const above = [{ x: it.x, y: it.groundY - it.r * 2.3 - 12 }];
+  const above = [{ x: it.x, y: it.groundY - it.r * 2.3 - 12 - (it.headroom || 0) }];
   return it.above ? [...above, ...below] : [...below, ...above];
 }
 
 /**
- * @param {Array<{ id: string, text: string, x: number, groundY: number, r: number, status?: string, above?: boolean }>} items
+ * @param {Array<{ id: string, text: string, x: number, groundY: number, r: number, status?: string, above?: boolean, headroom?: number }>} items
  * @param {(text: string) => number} measure text width in px
  * @param {Array<{l:number,r:number,t:number,b:number}>} [blocked] areas labels must avoid
  * @returns {Array<{ id: string, text: string, x: number, y: number, visible: boolean, box: {l:number,r:number,t:number,b:number} }>}
