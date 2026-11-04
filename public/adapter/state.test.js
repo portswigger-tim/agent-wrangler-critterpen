@@ -47,7 +47,6 @@ test('statusFor: other PR states and plain idle are idle', () => {
   for (const s of ['passing', 'pending', 'none', 'awaiting-review', 'changes-requested', undefined]) {
     assert.equal(statusFor(session('a', { links: [pr(1, s)] }), NOW), 'idle', String(s));
   }
-  assert.equal(statusFor(session('a', { dormant: true }), NOW), 'idle');
   assert.equal(statusFor(session('a', { status: 'unknown' }), NOW), 'idle');
 });
 
@@ -97,4 +96,81 @@ test('toPenState output satisfies the engine contract', async (t) => {
     session('e', { label: '' }),
   ], { tasks: [{ id: 't1', name: 'T' }], assignments: { a: 't1' } });
   assert.deepEqual(contract.validatePenState(toPenState(g, NOW)), []);
+});
+
+// ── the split of 'idle' ──────────────────────────────────────────────────────
+
+test('statusFor: no live pane (dormant or unmanaged) or snoozed is asleep', () => {
+  assert.equal(statusFor(session('a', { dormant: true, managed: false }), NOW), 'asleep');
+  assert.equal(statusFor(session('a', { managed: false }), NOW), 'asleep');
+  assert.equal(statusFor(session('a', { snooze: { until: NOW + 60_000 } }), NOW), 'asleep');
+  assert.equal(statusFor(session('a', { snooze: { until: NOW - 1 } }), NOW), 'idle');
+});
+
+test('statusFor: idle with a running sub-agent or a working teammate is working', () => {
+  assert.equal(statusFor(session('a', { subAgents: [{ status: 'completed' }, { status: 'running' }] }), NOW), 'working');
+  assert.equal(statusFor(session('a', { subAgents: [{ status: 'completed' }] }), NOW), 'idle');
+  assert.equal(statusFor(session('a', { teammates: [{ status: 'idle' }, { status: 'working' }] }), NOW), 'working');
+});
+
+test('statusFor: finished until acknowledged; dormant or snoozed still sleeps; dozing never hides a result', () => {
+  const finished = new Set(['a']);
+  assert.equal(statusFor(session('a'), NOW, { finished }), 'finished');
+  assert.equal(statusFor(session('a'), NOW, { finished, quiet: new Set(['a']) }), 'finished');
+  assert.equal(statusFor(session('a', { dormant: true, managed: false }), NOW, { finished }), 'asleep');
+  assert.equal(statusFor(session('a'), NOW, { quiet: new Set(['a']) }), 'asleep');
+});
+
+test('statusFor: a failing PR still shows red on a sleeping or finished card', () => {
+  const failing = { links: [pr(1, 'failing')] };
+  assert.equal(statusFor(session('a', { ...failing, dormant: true, managed: false }), NOW), 'error');
+  assert.equal(statusFor(session('a', failing), NOW, { finished: new Set(['a']) }), 'error');
+});
+
+test('toPenState: a parent whose child is working or thinking is busy elsewhere (thinking)', () => {
+  const kid = (status, over = {}) => session('kid', { status, spawnedBy: 'p', ...over });
+  const parentStatus = (...kids) => toPenState(graph([session('p'), ...kids]), NOW).critters.find((c) => c.id === 'p').status;
+  assert.equal(parentStatus(kid('working')), 'thinking');
+  assert.equal(parentStatus(kid('working', { lastActivity: NOW - 10 * THINKING_AFTER_MS })), 'thinking');
+  assert.equal(parentStatus(kid('idle', { hasBackgroundShell: true })), 'thinking');
+  assert.equal(parentStatus(kid('idle')), 'idle');
+  assert.equal(parentStatus(kid('needs-you')), 'idle');
+  assert.equal(parentStatus(session('kid', { status: 'working', parentSession: 'p' })), 'thinking');
+});
+
+test('toPenState: busy elsewhere is one level deep (a grandchild working does not wake the grandparent)', () => {
+  const g = graph([session('gp'), session('p', { spawnedBy: 'gp' }), session('kid', { status: 'working', spawnedBy: 'p' })]);
+  const byId = Object.fromEntries(toPenState(g, NOW).critters.map((c) => [c.id, c.status]));
+  assert.deepEqual(byId, { gp: 'idle', p: 'thinking', kid: 'working' });
+});
+
+test('toPenState on the live board\'s real shapes', async () => {
+  const live = await import('./live-board.fixture.js');
+  const byId = Object.fromEntries(toPenState(graph(live.all), NOW).critters.map((c) => [c.id, c.status]));
+  assert.deepEqual(byId, {
+    '0069b540': 'thinking', // orchestrator: its child's background job is running
+    '69fff775': 'working', // the green JOB
+    '6159bca6': 'idle', // live at its prompt (dozing is the stateful adapter's call)
+    db362dd0: 'idle',
+    '3ccee247': 'asleep', // dormant: Resume on the board
+    c8e23b4d: 'asleep',
+  });
+});
+
+test('every new status satisfies the engine contract (todo until it lists them)', async (t) => {
+  const contract = await loadContract();
+  if (!contract) return t.skip('public/engine/contract.js not present');
+  for (const status of ['finished', 'asleep']) {
+    if (!contract.STATUSES.includes(status)) { t.todo(`engine contract does not list "${status}" yet`); continue; }
+    assert.deepEqual(contract.validateCritter({ id: 'a', name: 'A', taskId: 't', taskName: 'T', agent: 'claude', status }), []);
+  }
+});
+
+test('forEngine: statuses an older engine does not know fall back to idle; a newer engine gets them as-is', async () => {
+  const { forEngine } = await import('./state.js');
+  const state = { critters: [{ id: 'a', status: 'asleep' }, { id: 'b', status: 'finished' }, { id: 'c', status: 'working' }] };
+  const old = ['working', 'thinking', 'needs-you', 'error', 'idle', 'archived'];
+  assert.deepEqual(forEngine(state, old).critters.map((c) => c.status), ['idle', 'idle', 'working']);
+  assert.equal(forEngine(state, [...old, 'asleep', 'finished']), state);
+  assert.equal(forEngine(state, undefined), state);
 });
