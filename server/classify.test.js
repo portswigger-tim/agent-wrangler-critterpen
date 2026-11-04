@@ -14,7 +14,14 @@ test('git operations come out as "git <op>" from a fixed list', () => {
   assert.deepEqual(classifyBash('git push -u origin feat-x'), { kind: 'git', label: 'git push' });
   assert.deepEqual(classifyBash('cd /some/where && git -C repo commit -m "wip"'), { kind: 'git', label: 'git commit' });
   assert.deepEqual(classifyBash('GIT_TRACE=1 git checkout -b x'), { kind: 'git', label: 'git checkout' });
+  assert.deepEqual(classifyBash('git init demo && git -C demo status'), { kind: 'git', label: 'git init' });
   assert.deepEqual(classifyBash('git my-secret-alias'), { kind: 'git', label: 'git' });
+});
+
+test('the most outward-facing git op on a line wins', () => {
+  assert.deepEqual(classifyBash('cd act && git add a.txt && git commit -m init'), { kind: 'git', label: 'git commit' });
+  assert.deepEqual(classifyBash('git add -A && git commit -m x && git push'), { kind: 'git', label: 'git push' });
+  assert.deepEqual(classifyBash('git status && git diff'), { kind: 'git', label: 'git status' });
 });
 
 test('git wins over everything else on the line', () => {

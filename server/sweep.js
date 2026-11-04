@@ -79,17 +79,37 @@ async function readRange(file, start, length) {
   }
 }
 
+// The cwd a transcript started in: the first line that records one. Undefined
+// while the head holds none yet (a brand-new file).
+export const HEAD_BYTES = 64 * 1024;
+async function startCwd(file) {
+  const head = (await readRange(file, 0, HEAD_BYTES)).toString('utf8').split('\n');
+  for (const line of head) {
+    try {
+      const cwd = JSON.parse(line)?.cwd;
+      if (typeof cwd === 'string' && cwd) return cwd;
+    } catch { /* partial last line, or not JSON */ }
+  }
+  return undefined;
+}
+
 export function createActivitySweep({ projectsDir = claudeProjectsDir(), realpath = fs.realpath } = {}) {
   const tails = new Map(); // transcript path -> { offset, leftover, sessionId }
 
   // New complete lines of one transcript since the last tick.
-  async function newLines(file, size, sessionId) {
+  async function newLines(file, size, sessionId, cwds) {
     let t = tails.get(file);
     if (!t || t.sessionId !== sessionId) {
+      // The slug is lossy (a/b-c and a/b/c share a folder), so a transcript is
+      // the card's only if it STARTED in the card's cwd. Later lines may carry
+      // another cwd: that is the agent having cd'd, still its own work.
+      const start = await startCwd(file);
+      if (start === undefined) return []; // nothing to tell yet: ask again next tick
       // First sight: start at the end, so opening the board never replays history.
-      tails.set(file, { offset: size, leftover: '', sessionId });
+      tails.set(file, { offset: size, leftover: '', sessionId, foreign: !cwds.has(start) });
       return [];
     }
+    if (t.foreign) return [];
     if (size < t.offset) { t.offset = size; t.leftover = ''; return []; } // truncated/rewritten
     if (size - t.offset > SKIP_AHEAD) { t.offset = size - READ_CAP; t.leftover = ''; t.skipPartial = true; }
     if (size === t.offset) return [];
@@ -113,12 +133,10 @@ export function createActivitySweep({ projectsDir = claudeProjectsDir(), realpat
     }
     if (!found) return { file: null, events: [] };
     const events = [];
-    for (const line of await newLines(found.file, found.size, card.sessionId)) {
+    for (const line of await newLines(found.file, found.size, card.sessionId, cwds)) {
       if (!line.trim()) continue;
       let entry;
       try { entry = JSON.parse(line); } catch { continue; }
-      // The slug is lossy (a/b-c and a/b/c share one); the line's own cwd is not.
-      if (entry.cwd && !cwds.has(entry.cwd)) continue;
       for (const c of classifyLine(entry)) events.push(c.label ? { sessionId: card.sessionId, kind: c.kind, label: c.label } : { sessionId: card.sessionId, kind: c.kind });
     }
     return { file: found.file, events: events.slice(-MAX_EVENTS_PER_CARD) };

@@ -118,14 +118,47 @@ test('a cwd two cards share is skipped, however busy its transcript', async () =
   assert.equal(sweep.watching, 0);
 });
 
-test('lines whose own cwd differs from the card\'s are ignored (lossy slugs)', async () => {
-  const file = transcript('/a/b-c');
+test('a transcript that started in another cwd is not the card\'s (lossy slugs)', async () => {
+  // /a/b/c and /a/b-c share a project folder; this transcript began in /a/b/c.
+  const dir = path.join(projects, cwdSlug('/a/b-c'));
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, 'other.jsonl');
+  fs.writeFileSync(file, `${JSON.stringify({ type: 'user', cwd: '/a/b/c', message: { content: 'hi' } })}\n`);
   const sweep = sweepFor();
   const { sent, host } = fakeHost([{ sessionId: 'c', agent: 'claude', cwd: '/a/b-c' }]);
   await sweep.run({ host });
-  fs.appendFileSync(file, toolLine('/a/b/c', 'Bash', { command: 'git push' }) + toolLine('/a/b-c', 'Write', {}));
+  fs.appendFileSync(file, toolLine('/a/b/c', 'Bash', { command: 'git push' }));
   await sweep.run({ host });
-  assert.deepEqual(sent[0].events, [{ sessionId: 'c', kind: 'files', label: 'Write' }]);
+  assert.deepEqual(sent, []);
+});
+
+test('lines written after the agent cd\'d elsewhere still count', async () => {
+  const file = transcript('/repo');
+  const sweep = sweepFor();
+  const { sent, host } = fakeHost([{ sessionId: 'c', agent: 'claude', cwd: '/repo' }]);
+  await sweep.run({ host });
+  fs.appendFileSync(file, toolLine('/repo/sub', 'Bash', { command: 'git commit -m x' }) + toolLine('/elsewhere', 'Write', {}));
+  await sweep.run({ host });
+  assert.deepEqual(sent[0].events, [
+    { sessionId: 'c', kind: 'git', label: 'git commit' },
+    { sessionId: 'c', kind: 'files', label: 'Write' },
+  ]);
+});
+
+test('a brand-new transcript with no cwd yet is looked at again next tick', async () => {
+  const dir = path.join(projects, cwdSlug('/repo'));
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, 'fresh.jsonl');
+  fs.writeFileSync(file, `${JSON.stringify({ type: 'permission-mode', permissionMode: 'auto' })}\n`);
+  const sweep = sweepFor();
+  const { sent, host } = fakeHost([{ sessionId: 'c', agent: 'claude', cwd: '/repo' }]);
+  await sweep.run({ host });
+  assert.equal(sweep.watching, 0);
+  fs.appendFileSync(file, `${JSON.stringify({ type: 'user', cwd: '/repo', message: { content: 'go' } })}\n`);
+  await sweep.run({ host }); // first sight now: starts at the end
+  fs.appendFileSync(file, toolLine('/repo', 'Edit', {}));
+  await sweep.run({ host });
+  assert.deepEqual(sent[0].events, [{ sessionId: 'c', kind: 'files', label: 'Edit' }]);
 });
 
 test('the newest transcript in the folder is the live one (a resume starts a new file)', async () => {

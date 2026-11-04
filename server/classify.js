@@ -6,9 +6,12 @@
 // board, so the command text is only ever parsed to pick a word we already know.
 
 const GIT_OPS = new Set([
-  'add', 'branch', 'checkout', 'cherry-pick', 'clone', 'commit', 'diff', 'fetch', 'log', 'merge',
+  'add', 'branch', 'checkout', 'cherry-pick', 'clone', 'commit', 'diff', 'fetch', 'init', 'log', 'merge',
   'pull', 'push', 'rebase', 'reset', 'restore', 'revert', 'show', 'stash', 'status', 'switch', 'tag', 'worktree',
 ]);
+// How outward-facing a git op is; ties keep the first on the line.
+const GIT_RANK = { push: 3, commit: 2, merge: 1, rebase: 1, pull: 1, fetch: 1, clone: 1, checkout: 1, switch: 1, 'cherry-pick': 1, revert: 1, reset: 1, tag: 1 };
+const gitRank = (op) => (op === null ? -1 : GIT_RANK[op] ?? 0);
 const GH_PR_OPS = new Set(['checks', 'checkout', 'close', 'comment', 'create', 'diff', 'edit', 'list', 'merge', 'ready', 'review', 'status', 'view']);
 const WEB_PROGRAMS = new Set(['curl', 'wget', 'http', 'https']);
 const TERMINAL_PROGRAMS = new Set([
@@ -52,11 +55,12 @@ function subcommand(args) {
 
 export function classifyBash(command) {
   const cmds = commands(command);
-  // The most outward-facing thing the line does wins: git, then a PR, then the web.
-  for (const { program, args } of cmds) {
-    if (program !== 'git') continue;
-    const op = subcommand(args);
-    return { kind: 'git', label: GIT_OPS.has(op) ? `git ${op}` : 'git' };
+  // The most outward-facing thing the line does wins: git, then a PR, then the
+  // web. Among git ops, `git add && git commit && git push` reads as the push.
+  const gitOps = cmds.filter((c) => c.program === 'git').map((c) => subcommand(c.args)).map((op) => (GIT_OPS.has(op) ? op : null));
+  if (gitOps.length) {
+    const op = gitOps.reduce((best, o) => (gitRank(o) > gitRank(best) ? o : best));
+    return { kind: 'git', label: op ? `git ${op}` : 'git' };
   }
   for (const { program, args } of cmds) {
     if (program !== 'gh' || subcommand(args) !== 'pr') continue;
