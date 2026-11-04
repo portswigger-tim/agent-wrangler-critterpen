@@ -20,6 +20,8 @@ export const KEEPER_NAMES = Object.freeze({
 });
 
 const UNIT = 2.2; // same building unit as buildings.js
+/** Keeper bodies are drawn in their own units, KSIZE building units each (~28px tall at scale 1). */
+const KSIZE = 1.6;
 
 /**
  * Catch timeline: the engine starts it CATCH.lead seconds before the
@@ -48,10 +50,10 @@ export function recentCatches(landTimes, now, window = FULL_WINDOW) {
   return n;
 }
 
-const SPOT = { // keeper ground point relative to the building base, in building units
-  git: [15, 2], pr: [-14, 2], jira: [23, 3], terminal: [0, -2], web: [16, 3], files: [19, -8.6],
+const SPOT = { // keeper ground point relative to the building base, in building units (in front of it)
+  git: [13, 3.5], pr: [-14, 3.5], jira: [12, 4], terminal: [0, -2], web: [13, 4], files: [14, 4],
 };
-const MOUTH = { // mouth relative to the keeper's ground point, in building units
+const MOUTH = { // mouth relative to the keeper's ground point, in keeper units
   git: [0, -5.2], pr: [0, -5.8], jira: [0, -6.2], terminal: [0, -5.8], web: [0, -9.4], files: [3.6, -4.2],
 };
 
@@ -64,13 +66,13 @@ export function keeperSpot(kind, scale = 1) {
 /** Where projectiles should land: the keeper's mouth, relative to the building's base point (px). */
 export function keeperMouth(kind, scale = 1) {
   const s = SPOT[kind], m = MOUTH[kind];
-  return s ? { dx: (s[0] + m[0]) * UNIT * scale, dy: (s[1] + m[1]) * UNIT * scale } : null;
+  return s ? { dx: (s[0] + m[0] * KSIZE) * UNIT * scale, dy: (s[1] + m[1] * KSIZE) * UNIT * scale } : null;
 }
 
 /** Hover circle around the keeper, relative to the building's base point (px). */
 export function keeperHitbox(kind, scale = 1) {
   const s = SPOT[kind];
-  return s ? { dx: s[0] * UNIT * scale, dy: (s[1] - 4.5) * UNIT * scale, r: 6.5 * UNIT * scale } : null;
+  return s ? { dx: s[0] * UNIT * scale, dy: (s[1] - 4.5 * KSIZE) * UNIT * scale, r: 6.5 * KSIZE * UNIT * scale } : null;
 }
 
 const smooth = (x) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
@@ -129,11 +131,18 @@ export function keeperColors(kind, pal) {
   const mute = (c, s = 0.28) => { const h = rgbToHsl(c); return hslToRgb(h.h, Math.min(h.s, s), h.l, 1); };
   switch (kind) {
     case 'git': return { body: mute(n.wood, 0.4), dark: n.woodDark, accent: n.grass };              // acorn-brown forager, leaf hat
-    case 'pr': return { body: mute(lighten(n.wall, 0.05)), dark: darken(n.wall, 0.45), accent: mute(n.woodDark) }; // oatmeal postie, brown cap
-    case 'jira': return { body: mute(mix(n.wall, pal.blue, 0.35), 0.22), dark: mute(darken(mix(n.wall, pal.blue, 0.35), 0.45), 0.22), accent: n.ink }; // our own slate blue
+    case 'pr': return { // a postie in oatmeal (dark themes) or khaki (light, where oatmeal sits too close to idle grey), brown cap
+      body: pal.dark ? mute(lighten(n.wall, 0.05)) : mute(mix(n.wood, n.wall, 0.4), 0.35), dark: darken(n.wall, 0.45), accent: mute(n.woodDark),
+    };
+    case 'jira': { // our own deep slate blue (theme --blue's hue), well apart from thinking, idle, asleep and finished
+      const slate = hslToRgb(rgbToHsl(pal.blue).h, 0.28, pal.dark ? 0.4 : 0.44);
+      return { body: slate, dark: darken(slate, 0.4), accent: lighten(n.wall, 0.2) };
+    }
     case 'terminal': return { body: mute(mix(n.dirt, n.gold, 0.35), 0.45), dark: n.dirtDark, accent: lighten(n.gold, 0.4) }; // coal-ember
     case 'web': return { body: mute(mix(n.dirt, n.wall, 0.35), 0.35), dark: n.dirtDark, accent: n.woodDark }; // dusty terracotta balloon
-    case 'files': return { body: mute(n.wall, 0.3), dark: darken(n.wall, 0.4), accent: n.woodDark };  // paper-cream bookworm
+    case 'files': return { // a bookworm in paper cream (dark themes) or old parchment (light, clear of idle grey)
+      body: pal.dark ? mute(n.wall, 0.3) : mute(darken(mix(n.wall, n.gold, 0.3), 0.08), 0.4), dark: darken(n.wall, 0.4), accent: n.woodDark,
+    };
     default: return null;
   }
 }
@@ -159,8 +168,18 @@ function beadEyes(ctx, u, x, y, gap, eyes, ink) {
 /** Mouth: a small line when shut, a dark oval when open (0..1). */
 function mouth(ctx, u, x, y, open, ink, wide = 1) {
   if (open > 0.05) {
-    ellipse(ctx, x, y, (1 + 0.6 * open) * u * wide, (0.3 + 1.3 * open) * u);
+    // An eager "D": flat top, round bottom, a pink tongue.
+    const rx = (1.1 + 0.9 * open) * u * wide, ry = (0.35 + 1.0 * open) * u;
+    ctx.beginPath();
+    ctx.moveTo(x - rx, y - ry * 0.35);
+    ctx.lineTo(x + rx, y - ry * 0.35);
+    ctx.ellipse(x, y - ry * 0.35, rx, ry * 1.35, 0, 0, Math.PI);
+    ctx.closePath();
     ctx.fillStyle = toCss(darken(ink, 0.2)); ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.fillStyle = 'rgba(240,120,140,0.95)';
+    ellipse(ctx, x, y + ry * 0.95, rx * 0.65, ry * 0.55); ctx.fill();
+    ctx.restore();
   } else {
     ctx.strokeStyle = toCss(ink); ctx.lineWidth = 0.55 * u; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.arc(x, y - 0.5 * u, 0.9 * u * wide, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
@@ -291,7 +310,7 @@ export function drawKeeper(ctx, kind, x, y, scale, pal, t, catchState = {}, { re
   if (!body || alpha <= 0.01) return;
   const c = keeperColors(kind, pal);
   const n = naturePalette(pal);
-  const u = UNIT * scale;
+  const u = UNIT * scale * KSIZE;
   const s = keeperSpot(kind, scale);
   const ps = keeperPose(kind, reduced ? 0 : t, catchState, reduced);
   ctx.save();

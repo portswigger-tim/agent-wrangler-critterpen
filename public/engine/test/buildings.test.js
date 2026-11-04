@@ -187,3 +187,17 @@ test('phone box under reduced motion: ring arcs show while anyone waits, and hol
   assert.equal(arcs({ reduced: true, waiting: 0 }).length, 0, 'none when nobody waits');
   assert.deepEqual(arcs({ reduced: true, waiting: 1 }, 0), arcs({ reduced: true, waiting: 1 }, 7.3), 'no motion');
 });
+
+test('phone box red: warm pillar-box red, clearly apart from the error status', async () => {
+  const { phoneRed } = await import('../buildings.js');
+  const { statusColor, contrast } = await import('../color.js');
+  for (const mode of ['dark', 'light']) {
+    const pal = palFor(mode);
+    const box = rgbToHsl(phoneRed(pal)), err = rgbToHsl(statusColor('error', pal)), red = rgbToHsl(pal.red);
+    assert.ok(hueDistance(box.h, red.h) >= 5 && hueDistance(box.h, red.h) <= 12, `${mode}: warmer than --red but still red (${box.h.toFixed(1)} vs ${red.h.toFixed(1)})`);
+    assert.ok(box.h > red.h || red.h > 300, `${mode}: shifted toward orange, not pink`);
+    assert.ok(err.l - box.l >= 0.08, `${mode}: deeper than the error critter`);
+    assert.ok(box.s >= 0.65, `${mode}: rich, not salmon`);
+    assert.ok(contrast(phoneRed(pal), statusColor('error', pal)) >= 1.25, `${mode}: visibly different from error`);
+  }
+});

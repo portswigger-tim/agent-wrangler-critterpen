@@ -837,7 +837,7 @@ export function createPen(el, opts = {}) {
     if (!layout) return;
     const dt = 1 / 60;
     // ── personality hooks ── soft sky (gradient, clouds or stars) behind the scene.
-    if (!layout.compact) drawSky(ctx, { W, H, pal, time, reduced, horizon: layout.mainland ? layout.mainland.y + 30 : H });
+    if (!layout.compact) drawSky(ctx, { W, H, pal, time, reduced });
 
     // ── islands / wander ── mainland, then islands back to front with signposts.
     if (layout.mainland) {
