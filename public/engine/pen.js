@@ -4,11 +4,13 @@
 import { LANDMARK_KINDS, STATUSES, isPenEvent } from './contract.js';
 import { critterTraits, rng, clamp, lerp, ease, springStep, truncateToWidth, quad, quadAngle, arcControl, TAU } from './util.js';
 import { readTheme, toCss, mix, lighten, darken, statusColor } from './color.js';
-import { computeLayout, LANDMARK_LABELS } from './layout.js';
+import { computeLayout, islandPoint, LANDMARK_LABELS } from './layout.js';
+import { createWander, stepWander, wanderPace, separate, bellSlot } from './wander.js';
+import { drawIsland, drawSignpost, drawMainland, drawBuilding } from './scene.js';
 import { diffCritters } from './diff.js';
 import {
   ACCESSORIES, agentTint, kindColor, drawCritter, drawShadow, drawBubble, drawThinkingDots,
-  drawDizzyStars, drawStar, drawLandmark, drawProjectile, haloText, roundRect, ellipse, drawChatBubble,
+  drawDizzyStars, drawStar, drawProjectile, haloText, roundRect, ellipse, drawChatBubble,
 } from './art.js';
 // ── personality hooks ── (behaviour.js / ambient.js / art.js are the character artist's)
 import { createMind, applyBehaviour } from './behaviour.js';
@@ -56,6 +58,9 @@ export function createPen(el, opts = {}) {
   /** @type {Map<string, any>} */ let prev = new Map();
   /** @type {ReturnType<typeof computeLayout>|null} */ let layout = null;
   const clusterViz = new Map();
+  // ── islands / wander ──
+  const islandViz = new Map(); // taskId → eased island geometry + bob
+  const bellQueue = []; // ids of critters waiting at the bell, in arrival order
   const projectiles = [], particles = [], floaters = [];
   const lmState = new Map(LANDMARK_KINDS.map((k) => [k, { pulseAge: 9, ringAge: 9, glowAge: 9, wiggleAge: 9 }]));
   const pendingBaby = new Map(); // parentId → { x, y, at }
@@ -88,6 +93,8 @@ export function createPen(el, opts = {}) {
       visit: null, hopP: 0, smokeT: rand() * 2, zT: rand() * 2,
       label: null, labelFor: '',
       cx: 0, cy: 0, cr: 0, flip: false, spin: 0,
+      // ── islands / wander ──
+      wander: null, home: null, place: null, hop: null, landed: false,
       // ── personality hooks ──
       mind: createMind(seed), gaze: { x: 0, y: 0 }, attn: null,
     };
@@ -174,12 +181,19 @@ export function createPen(el, opts = {}) {
   function relayout() {
     const live = [];
     for (const s of sprites.values()) if (s.life === 'enter' || s.life === 'live') live.push(s.data);
-    layout = computeLayout({ width: W, height: H, critters: live });
+    layout = computeLayout({ width: W, height: H, critters: live, anchors: layout?.anchors });
     labelWidth = layout.labelWidth;
     for (const [id, slot] of layout.slots) {
       const s = sprites.get(id);
       if (!s) continue;
       s.homeR = slot.r * s.sizeJitter;
+      // ── islands / wander ── keep wandering where it was unless the task changed.
+      const spot = layout.spots?.get(id);
+      if (spot && (!s.wander || s.home?.taskId !== spot.taskId)) {
+        s.wander = createWander(spot.u, spot.v, s.rand);
+        s.home = { taskId: spot.taskId };
+      } else if (spot && reduced) { s.wander.u = spot.u; s.wander.v = spot.v; }
+      if (!spot) { s.wander = null; s.home = null; }
       s.homeX = slot.x;
       s.homeY = slot.y + slot.r; // ground point
       if (!s.placed) {
@@ -352,10 +366,69 @@ export function createPen(el, opts = {}) {
 
   // ── simulation ─────────────────────────────────────────────────────────────
 
+  // ── islands / wander ──
+  /** Ease island geometry toward the layout, bob it, keep the bell queue, space critters out. */
+  function updateIslands(dt) {
+    const seen = new Set();
+    for (const isl of layout?.islands || []) {
+      seen.add(isl.taskId);
+      let v = islandViz.get(isl.taskId);
+      if (!v) { v = { ...isl, a: reduced ? 1 : 0, bob: 0, phase: (isl.seed % 1000) / 160 }; islandViz.set(isl.taskId, v); }
+      const k = reduced ? 1 : 1 - Math.exp(-dt * 4);
+      for (const f of ['cx', 'cy', 'rx', 'ry']) v[f] += (isl[f] - v[f]) * k;
+      Object.assign(v, { taskName: isl.taskName, rocky: isl.rocky, seed: isl.seed, gone: false });
+      v.a = Math.min(1, v.a + dt * 2);
+      v.bob = reduced ? 0 : Math.sin(time * 0.8 + v.phase) * 3;
+    }
+    for (const [id, v] of islandViz) {
+      if (seen.has(id)) continue;
+      v.gone = true;
+      v.a -= dt * 1.5;
+      if (v.a <= 0 || reduced) islandViz.delete(id);
+    }
+    // Bell queue: needs-you critters, first come first served.
+    for (const s of sprites.values()) {
+      const wants = layout?.mainland && s.status === 'needs-you' && (s.life === 'live' || s.life === 'enter');
+      const i = bellQueue.indexOf(s.id);
+      if (wants && i < 0) bellQueue.push(s.id);
+      else if (!wants && i >= 0) bellQueue.splice(i, 1);
+    }
+    for (let i = bellQueue.length - 1; i >= 0; i--) if (!sprites.has(bellQueue[i])) bellQueue.splice(i, 1);
+    if (reduced) return;
+    // Personal space on each island.
+    const byIsland = new Map();
+    for (const s of sprites.values()) {
+      if (!s.wander || s.life !== 'live' || s.place !== 'island' || s.hop) continue;
+      if (!byIsland.has(s.home.taskId)) byIsland.set(s.home.taskId, []);
+      byIsland.get(s.home.taskId).push(s.wander);
+    }
+    for (const [id, list] of byIsland) {
+      const v = islandViz.get(id);
+      // Depth counts for less than width: a critter standing behind another is
+      // hidden by it unless they're well apart front-to-back.
+      if (v && list.length > 1) separate(list, layout.radius * 2.4, Math.max(1, v.rx - layout.radius * 0.9), Math.max(1, v.ry - layout.radius * 0.4) * 0.5, 0.2);
+    }
+  }
+
+  /** Advance a hop along an arc toward (tx, ty); true once it has landed. */
+  function stepHop(s, dt, tx, ty) {
+    const h = s.hop;
+    h.age += dt;
+    const k = clamp(h.age / h.dur, 0, 1);
+    const to = { x: tx, y: ty };
+    const lift = Math.max(50, Math.hypot(tx - h.from.x, ty - h.from.y) * 0.35);
+    const ctl = { x: (h.from.x + tx) / 2, y: Math.min(h.from.y, ty) - lift };
+    const p = quad(h.from, ctl, to, ease.inOutSine(k));
+    s.x.x = p.x; s.y.x = p.y; s.x.v = 0; s.y.v = 0;
+    if (k >= 1) { s.hop = null; return true; }
+    return false;
+  }
+
   function update(dt) {
     time += dt;
     frameDt = dt;
     if (needsLayout) relayout();
+    updateIslands(dt);
 
     for (const s of sprites.values()) {
       s.age += dt;
@@ -380,6 +453,12 @@ export function createPen(el, opts = {}) {
           if (s.alpha <= 0) sprites.delete(s.id);
           continue;
         }
+        if (s.leaveAge > 1.1 && layout?.mainland && !s.landed) {
+          // ── islands / wander ── hop down to the mainland, then walk off.
+          s.hop ??= { from: { x: s.x.x, y: s.y.x }, to: { x: s.x.x, y: layout.mainland.y + layout.mainland.h * 0.78 }, age: 0, dur: 0.7 };
+          if (stepHop(s, dt, s.hop.to.x, s.hop.to.y)) s.landed = true;
+          continue;
+        }
         if (s.leaveAge > 1.1) {
           const speed = 70 + s.homeR * 3;
           s.x.x += s.leaveDir * speed * dt;
@@ -393,12 +472,30 @@ export function createPen(el, opts = {}) {
 
       // Movement: spring toward home (or the bell when visiting the human).
       let tx = s.homeX, ty = s.homeY;
+      // ── islands / wander ── home is a wandering point on the island, or the bell queue.
+      let place = 'home';
+      const iv = s.home && islandViz.get(s.home.taskId);
+      if (iv) {
+        if (!reduced && !s.hop) stepWander(s.wander, dt, s.rand, wanderPace(s.status));
+        const p = islandPoint(iv, s.wander.u, s.wander.v, s.r.x);
+        tx = p.x; ty = p.y + iv.bob;
+        place = 'island';
+      }
+      const qi = bellQueue.indexOf(s.id);
+      const bell = qi >= 0 && layout.landmarks.find((l) => l.kind === 'human');
+      if (bell) {
+        const b = bellSlot(qi, bell, layout.radius);
+        tx = b.x; ty = b.y; place = 'bell';
+        s.lookAt = { x: bell.x, y: bell.y }; s.lookUntil = time + 0.2;
+      }
       if (s.visit) {
         const v = s.visit;
         v.age += dt;
         const lm = v.lm;
         const inward = lm.side === 'left' ? 1 : lm.side === 'right' ? -1 : 0;
-        const vx = lm.x + inward * (lm.r + s.r.x * 1.3), vy = lm.y + (lm.side === 'top' ? lm.r + s.r.x * 2.4 : lm.side === 'bottom' ? -lm.r : lm.r * 0.6);
+        let vx = lm.x + inward * (lm.r + s.r.x * 1.3), vy = lm.y + (lm.side === 'top' ? lm.r + s.r.x * 2.4 : lm.side === 'bottom' ? -lm.r : lm.r * 0.6);
+        if (lm.baseY != null && lm.side === 'bottom') { vx = lm.x - (lm.r * 1.2 + s.r.x); vy = lm.baseY + s.r.x * 0.35; }
+        place = 'visit';
         if (v.stage === 'go') {
           tx = vx; ty = vy;
           if (Math.hypot(s.x.x - vx, s.y.x - vy) < 6 || v.age > 2.2) { v.stage = 'ring'; v.age = 0; hitLandmark(lm, v.label); }
@@ -408,7 +505,14 @@ export function createPen(el, opts = {}) {
           if (v.age > 1.3) s.visit = null;
         }
       }
-      if (!s.enterFrom || s.enterFrom.landed) {
+      // ── islands / wander ── changing place (island ↔ bell) is a hop through the air.
+      if (s.place && place !== s.place && layout.mainland && !reduced && s.life === 'live') {
+        s.hop = { from: { x: s.x.x, y: s.y.x }, age: 0, dur: clamp(Math.hypot(tx - s.x.x, ty - s.y.x) / 420, 0.55, 1.1) };
+      }
+      s.place = place;
+      if (reduced && layout.mainland && s.life === 'live') { s.hop = null; placeAt(s, tx, ty); }
+      else if (s.hop) stepHop(s, dt, tx, ty);
+      else if (!s.enterFrom || s.enterFrom.landed) {
         springStep(s.x, tx, dt, 40, 2 * Math.sqrt(40) * 1.05);
         springStep(s.y, ty, dt, 40, 2 * Math.sqrt(40) * 1.05);
       } else {
@@ -433,7 +537,7 @@ export function createPen(el, opts = {}) {
       if (s.status === 'working') {
         const P = 0.62 + s.hop * 0.02;
         const p = ((time + s.phase) / P) % 1;
-        if (s.hopP < 0.75 && p >= 0.75) puff(s.cx, s.homeY, 'dust');
+        if (s.hopP < 0.75 && p >= 0.75) puff(s.cx, s.y.x, 'dust');
         s.hopP = p;
         s.spin += dt * 18;
       } else if (s.status === 'error') {
@@ -555,9 +659,9 @@ export function createPen(el, opts = {}) {
       }
       case 'idle':
       default: {
-        // Awake and relaxed at the prompt: easy breathing, soft lids.
+        // Awake and relaxed at the prompt: easy breathing, soft lids, eyes drifting a little.
         const b = Math.sin(t * 1.1);
-        return { ...REST, ...RELAXED, sx: 1 - 0.025 * b, sy: 1 + 0.03 * b, eyes: 'open', wave: null };
+        return { ...REST, ...RELAXED, sx: 1 - 0.025 * b, sy: 1 + 0.03 * b, lookX: Math.sin(t * 0.35) * 0.4, lookY: Math.sin(t * 0.23) * 0.2, eyes: 'open', wave: null };
       }
     }
   }
@@ -689,7 +793,17 @@ export function createPen(el, opts = {}) {
     if (!layout) return;
     const dt = 1 / 60;
 
-    // Cluster patches + task labels, eased toward their targets.
+    // ── islands / wander ── mainland, then islands back to front with signposts.
+    if (layout.mainland) {
+      drawMainland(ctx, layout.mainland, pal);
+      const isles = [...islandViz.values()].sort((a, b) => a.cy - b.cy);
+      for (const v of isles) {
+        drawIsland(ctx, v, pal, { bob: v.bob, alpha: v.a });
+        drawSignpost(ctx, v.cx, v.cy + v.bob + v.ry * 1.3 + 4, v.taskName, pal, { scale: clamp(layout.radius / 18, 0.8, 1.15), alpha: v.a, hang: true });
+      }
+    }
+
+    // Cluster patches + task labels (compact tray), eased toward their targets.
     const seen = new Set();
     for (const c of layout.clusters) {
       seen.add(c.taskId);
@@ -734,11 +848,10 @@ export function createPen(el, opts = {}) {
         glow = Math.max(glow, reduced ? 0.6 : 0.35 + 0.25 * Math.sin(time * 4));
         if (!reduced) { const q = time % 2.6; if (q < 0.6) wiggle += Math.sin(q * 30) * 0.18 * (1 - q / 0.6); }
       }
-      drawLandmark(ctx, lm, pal, {
+      drawBuilding(ctx, lm, pal, {
         pulse, glow, wiggle,
         ring: !reduced && st.ringAge < 0.7 ? st.ringAge / 0.7 : null,
-        badge: lm.kind === 'human' ? needsYou : 0,
-      }, LANDMARK_LABELS[lm.kind], layout.compact);
+      }, LANDMARK_LABELS[lm.kind], reduced ? 0 : time, layout.compact);
     }
 
     // Compute render positions first (leashes need them).
@@ -775,6 +888,7 @@ export function createPen(el, opts = {}) {
 
     list.sort((a, b) => a.s.y.x - b.s.y.x);
     const hoverSprite = hovered ? sprites.get(hovered) : null;
+    const labels = [];
     for (const { s, pose, r } of list) {
       const color = currentColor(s);
       const groundY = s.y.x;
@@ -825,8 +939,21 @@ export function createPen(el, opts = {}) {
       }
       if (!layout.compact && hovered !== s.id) {
         const near = hoverSprite && Math.abs(hoverSprite.y.x - groundY) < 30 && Math.abs(hoverSprite.x.x - s.x.x) < labelWidth * 1.5;
-        haloText(ctx, s.label, s.x.x, groundY + 10, pal, (s.status === 'asleep' ? 0.6 : 0.85) * a * (near ? 0.2 : 1), FONT_NAME);
+        labels.push({ s, text: s.label, x: s.x.x, y: groundY + 10, alpha: (s.status === 'asleep' ? 0.6 : 0.85) * a * (near ? 0.2 : 1) });
       }
+    }
+
+    // ── islands / wander ── name labels over all critters, front-most first;
+    // a label that would sit on one already drawn steps back to a whisper.
+    ctx.font = FONT_NAME;
+    labels.sort((p, q) => q.y - p.y);
+    const taken = [];
+    for (const l of labels) {
+      const w = ctx.measureText(l.text).width + 6;
+      const box = { l: l.x - w / 2, r: l.x + w / 2, t: l.y - 7, b: l.y + 7 };
+      const clash = taken.some((o) => box.l < o.r && box.r > o.l && box.t < o.b && box.b > o.t);
+      if (!clash) taken.push(box);
+      haloText(ctx, l.text, l.x, l.y, pal, l.alpha * (clash ? 0.12 : 1), FONT_NAME);
     }
 
     // Particles.
@@ -936,6 +1063,13 @@ export function createPen(el, opts = {}) {
 
   // ── loop, sizing, theme, input ─────────────────────────────────────────────
 
+  function setReduced(v) {
+    reduced = !!v;
+    needsLayout = true;
+    // Motion-only leftovers (dust, sparks, confetti) go at once.
+    if (reduced) particles.length = 0;
+  }
+
   function frame(ts) {
     raf = 0;
     if (destroyed) return;
@@ -978,7 +1112,7 @@ export function createPen(el, opts = {}) {
   const mqDark = matchMedia('(prefers-color-scheme: dark)');
   // An OS change is the user's latest word, so it wins over the initial option
   // or a setOptions() override. Hosts often pass a snapshot of this very query.
-  const onReduce = () => { reduced = mqReduce.matches; needsLayout = true; };
+  const onReduce = () => setReduced(mqReduce.matches);
   mqDark.addEventListener?.('change', refreshTheme);
   mqReduce.addEventListener?.('change', onReduce);
 
@@ -1029,7 +1163,7 @@ export function createPen(el, opts = {}) {
      * next prefers-reduced-motion change. */
     setOptions(o = {}) {
       if (o.theme) { themeMode = o.theme; setPalette(readTheme(el, themeMode)); }
-      if ('reducedMotion' in o) { reduced = o.reducedMotion ?? mqReduce.matches; needsLayout = true; }
+      if ('reducedMotion' in o) setReduced(o.reducedMotion ?? mqReduce.matches);
     },
     destroy() {
       destroyed = true;
