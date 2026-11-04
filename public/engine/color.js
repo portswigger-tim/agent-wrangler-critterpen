@@ -152,3 +152,83 @@ export function readTheme(el, theme = 'auto') {
   const pal = resolvePalette(raw, /** @type {'light'|'dark'} */ (mode), rasterise);
   return { ...pal, dark: isDark(pal.bg) };
 }
+
+/** RGBA → { h: 0..360, s: 0..1, l: 0..1, a }. */
+export function rgbToHsl(c) {
+  const r = c.r / 255, g = c.g / 255, b = c.b / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min;
+  if (d === 0) return { h: 0, s: 0, l, a: c.a };
+  const s = d / (1 - Math.abs(2 * l - 1));
+  let h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  h *= 60;
+  if (h < 0) h += 360;
+  return { h, s, l, a: c.a };
+}
+
+/** HSL (0..360, 0..1, 0..1) → RGBA. */
+export function hslToRgb(h, s, l, a = 1) {
+  const k = (n) => (n + h / 30) % 12;
+  const q = s * Math.min(l, 1 - l);
+  const f = (n) => l - q * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return { r: f(0) * 255, g: f(8) * 255, b: f(4) * 255, a };
+}
+
+const clamp01 = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+/**
+ * Soften a theme colour into the critters' pastel range: same hue, a little
+ * less saturation, lightness squeezed into a band that suits the background.
+ * Greys stay grey. On light themes the band sits lower so bodies keep their
+ * edge against a pale floor.
+ * @param {RGBA} c
+ * @param {boolean} dark palette background is dark
+ */
+export function pastel(c, dark) {
+  const { h, s, l, a } = rgbToHsl(c);
+  const L = dark ? clamp01(0.3 + l * 0.55, 0.64, 0.8) : clamp01(0.26 + l * 0.55, 0.58, 0.72);
+  const S = s < 0.2 ? s * 0.9 : clamp01(s * (dark ? 0.78 : 0.82), 0.32, dark ? 0.68 : 0.72);
+  return hslToRgb(h, S, L, a);
+}
+
+/** Smallest angle between two hues, 0..180. */
+export function hueDistance(a, b) {
+  const d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+}
+
+/**
+ * Darker, slightly warmer, more saturated cousin of a body colour for the
+ * critter's outline and feet: reads as "the same thing, in shadow".
+ */
+export function inkFor(c, amount = 0.42) {
+  const { h, s, l, a } = rgbToHsl(c);
+  const toward = s < 0.08 ? h : h + (h > 60 && h < 240 ? 12 : -10); // nudge toward violet/red, never toward mud
+  return hslToRgb((toward + 360) % 360, Math.min(0.72, s * 0.95 + 0.06), l * (1 - amount), a);
+}
+
+const restGrey = (pal) => (pal.dark ? mix(pal['surface-2'], pal.fg, 0.42) : mix(pal['surface-2'], pal.bg, 0.15));
+
+/**
+ * Body colour for a critter status in a palette from readTheme(): the status
+ * token, pastel-tuned. Idle/asleep are soft greys (asleep a hint bluer),
+ * finished leans toward the accent.
+ * @param {string} status
+ * @param {Record<string, RGBA> & { dark: boolean }} pal
+ */
+export function statusColor(status, pal) {
+  const dark = !!pal.dark;
+  switch (status) {
+    case 'working': return pastel(pal.green, dark);
+    case 'thinking': return pastel(pal.blue, dark);
+    case 'needs-you': return pastel(pal.yellow, dark);
+    case 'error': return pastel(pal.red, dark);
+    case 'archived': return ensureContrast(mix(pal['surface-2'], pal.bg, 0.25), pal.bg, 1.3);
+    case 'finished': return pastel(mix(restGrey(pal), pal.accent, 0.55), dark);
+    case 'asleep': return ensureContrast(mix(restGrey(pal), pal.blue, 0.1), pal.bg, dark ? 2.2 : 1.3);
+    default: {
+      // Awake idle: the same soft grey, a touch lighter and warmer than asleep.
+      const awake = dark ? mix(restGrey(pal), pal.fg, 0.12) : mix(restGrey(pal), pal.bg, 0.12);
+      return ensureContrast(mix(awake, pal.yellow, 0.05), pal.bg, dark ? 2.6 : 1.35);
+    }
+  }
+}

@@ -43,11 +43,20 @@ cd public/engine && npm test   # node --test, no dependencies
 | --- | --- |
 | `contract.js` | Typedefs + validators shared with the adapter |
 | `pen.js` | `createPen`: state diffing → sprites, rAF loop, poses, rendering, input |
-| `art.js` | Vector drawing: critters, accessories, landmark icons, projectiles |
-| `layout.js` | Pure layout: landmark slots, task grid, critter placement |
+| `art.js` | Vector drawing: critters (eyes, lids, mouths), accessories, bubbles, projectiles |
+| `behaviour.js` | Personality: rare, seeded, deterministic idle behaviours and pose modifiers |
+| `ambient.js` | Sky, fireflies (dark) and petals/motes (light); stateless |
+| `scene.js` | Scenery: floating islands, name planks, the mainland and its buildings |
+| `layout.js` | Pure layout: island sizing and packing, home spots, landmark positions, compact tray rows |
+| `wander.js` | Pure movement: wandering an island, personal space, the bell queue |
+| `labels.js` | Pure name-label placement so labels never overlap |
 | `diff.js` | Pure snapshot diff |
-| `color.js` | Colour parsing/mixing, theme token reading |
+| `color.js` | Colour parsing/mixing, HSL, pastel status colours, theme token reading |
 | `util.js` | Hashing, seeded RNG, easing, springs, text truncation |
+
+`sheet.html` is a character sheet: every status face and personality behaviour
+drawn large (`?theme=light`, `?t=3` to freeze time, `?r=60` for size). Use it
+when changing the art.
 
 Everything lives in `public/engine/` because the wrangler only serves an
 extension's `public/` folder; keep imports relative and inside this directory.

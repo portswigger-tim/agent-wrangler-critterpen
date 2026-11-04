@@ -125,3 +125,19 @@ test('setOptions forces a mode until the next OS change', () => {
   assert.ok(frame(env) !== frame(env), 'OS change overrides the forced value');
   pen.destroy();
 });
+
+test('reduced motion: no personality behaviours or ambient particles, even over minutes', () => {
+  // Asleep critters keep their eyes shut, so blinks can't change a frame; any
+  // yawn, chat, firefly or petal would.
+  const { env, el } = fakeDom({ reduce: true });
+  const pen = createPen(el);
+  const nap = (id) => ({ id, name: id, taskId: 't', taskName: 'T', agent: 'claude', status: 'asleep' });
+  pen.setState({ critters: [nap('a'), nap('b'), nap('c')] });
+  env.step(1);
+  const first = frame(env);
+  for (let i = 0; i < 120; i++) {
+    env.step(1);
+    assert.equal(frame(env), first, `frame changed at ~${i + 1}s`);
+  }
+  pen.destroy();
+});
