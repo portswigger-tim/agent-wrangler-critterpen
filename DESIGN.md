@@ -98,16 +98,33 @@ Either side may propose additions to the contract; change `engine/contract.js` a
 
 ## Data sources (adapter)
 
-Investigate what the client-side board graph exposes; known useful fields include
-session status, links (`pr`, `jira`), task membership, spawn lineage, checklist
-progress and PR check status. Per-tool activity (bash/edit/web) may not be in the
-graph — if not, find the cheapest honest source (e.g. a server-side extension that
-watches transcripts and broadcasts via `board:broadcast`) and propose it rather than
-faking events.
+The adapter lives in `public/adapter/` (the wrangler serves an extension's browser
+files only from its `public/`, so the engine is at `public/engine/` for the same
+reason). A `view`'s `update(el, session, graph)` gets the board's wire graph:
 
-Reference: `../agent-wrangler/docs/extensions.md`, `../agent-wrangler/public/slots.js`,
-builtin extensions under `../agent-wrangler/server/extensions/builtin/` (sounds and
-checklist are good small examples).
+| Critter field / status | Graph source |
+| --- | --- |
+| `id`, `name`, `agent` | `graph.sessions[].sessionId`, `.label`, `.agent` (`offBoard` cards skipped) |
+| `taskId`, `taskName` | `graph.tasks.assignments[sessionId]` → `graph.tasks.tasks[].name`; none = `adhoc` / "Unassigned" |
+| `parentId` | `.parentSession` (board nesting), else `.spawnedBy` (launch lineage) |
+| `needs-you` | `.status === 'needs-you'` (permission prompts, questions, API errors; reason in `.waitingFor`) |
+| `working` | `.status === 'working'` with transcript activity in the last 20 s, or `.rawStatus === 'shell'` (a Bash tool running) |
+| `thinking` | `.status === 'working'` and `.lastActivity` older than 20 s |
+| `error` | not working/needs-you, and one of its own PR links has `checkStatus: 'failing'` |
+| `idle` | everything else, including dormant cards; `unknown` reads idle only after 10 s (earlier it holds the previous look) |
+| `archived` | the card left `graph.sessions`; it stays 8 s as `archived` for the walk-off |
+
+Precedence: needs-you > working > thinking > error > idle.
+
+Graph-derived events (`public/adapter/events.js`, never on the first tick): new PR link
+→ `pr` (`#123`), new Jira link → `jira` (key), PR checks turning failing → `error`, a
+new card whose parent is on the pen → `spawn` from the parent, working → idle →
+`done`, entering needs-you → `human`. Task-level links are pinned to the task's
+working member, else its most recently active one.
+
+Tool activity (`git`, `pr`, `terminal`, `files`, `web`, `jira`) is not in the graph.
+It comes from the extension's own transcript sweep (`server/sweep.js`), described in
+[docs/activity-feed.md](docs/activity-feed.md).
 
 ## Milestones
 
