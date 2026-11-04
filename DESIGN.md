@@ -48,7 +48,7 @@ fit, everything shrinks a little. Sessions with no task get a small **rocky isle
 Critters **wander** their own island in island-local coordinates (`wander.js`), so a
 critter can never step off it: brisk strolls when working, slow ambles when thinking or
 idle, and staying put when finished, asleep or in error. **Personal space**
-(`PERSONAL_SPACE`, 2.5 radii between feet, with depth weighted at 0.75 so a hopping
+(`PERSONAL_SPACE`, 3 radii between feet, with depth weighted at 0.75 so a hopping
 front critter clears the one behind) keeps bodies apart while strolling and at rest:
 home spots are relaxed apart in the layout too, so reduced motion and the first frame
 are just as tidy.
@@ -64,12 +64,13 @@ the room their crowd needs (Σ scale²).
 **Name labels** (`labels.js`) drop a leading copy of the task name (matched loosely)
 and shorten long names from the middle by whole words, keeping the first and last
 (`util.truncateMiddle`; a single long word is cut inside). They are placed above
-everything in priority order
-(needs-you > finished > working > thinking > error > idle > asleep; parents first among
-equals, in bolder type; then front-most), each trying under the feet, a line lower,
-sideways or just over the head (clearing a hat or bubble, up to 22px), avoiding every
-critter's body, building captions and name planks; a label with no clear spot fades to
-a whisper. Name planks are drawn over flying debris.
+everything in priority order (needs-you > finished > working > thinking > error > idle >
+asleep; parents first among equals, in bolder type; then front-most). **A name stays
+with its owner:** it may move at most one body radius (`MAX_SHIFT`) from its default
+spot under the feet, trying the full name and then a short form (the last word,
+"…timeouts"), and it must avoid every critter's body, building captions and name planks.
+With no clear spot nearby it stays at its default spot faded to a whisper (hover shows
+the full name). Personal space of 3 radii keeps most names readable even in crowds.
 
 **Leashes** are a little rope (about 2.4px, earthy: light tan on dark themes, dark brown
 on light, over a contrasting halo) from parent to child, drawn above the islands and

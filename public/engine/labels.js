@@ -1,6 +1,8 @@
 // Pure name-label placement: every critter's label gets a spot that doesn't
 // cover another label (or a building caption), most important critters first.
 
+import { truncateMiddle } from './util.js';
+
 /** Who gets first pick of a clear spot: the critters you most need to read. */
 export const LABEL_PRIORITY = ['needs-you', 'finished', 'working', 'thinking', 'error', 'idle', 'asleep', 'archived'];
 
@@ -47,33 +49,61 @@ export function stripTaskPrefix(name, taskName) {
 } // line box for the 12px name font in pen.js (FONT_NAME)
 const overlaps = (a, b) => a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
 
+/** The short form of a name gets this fraction of the label width. */
+export const SHORT_FRACTION = 0.4;
+
 /**
- * Candidate label centres for a critter standing at (x, groundY) with radius r:
- * under its feet, a little lower, nudged sideways, and above its head (clear of
- * `headroom` px of hat or bubble). Queuers at the bell try above first, so they
- * don't sit on the building captions.
+ * The short form of a name for tight spots: its last word, which usually tells
+ * sessions apart ("…timeouts"), else a middle cut.
  */
-function candidates(it, w) {
-  const below = [
-    { x: it.x, y: it.groundY + 10 },
-    { x: it.x, y: it.groundY + 10 + LABEL_H },
-    { x: it.x - w * 0.35, y: it.groundY + 10 },
-    { x: it.x + w * 0.35, y: it.groundY + 10 },
-    { x: it.x - w * 0.6, y: it.groundY + 10 + LABEL_H },
-    { x: it.x + w * 0.6, y: it.groundY + 10 + LABEL_H },
-  ];
-  // Just over the head, clearing a hat or bubble up to MAX_HEADROOM, never adrift.
-  const ay = it.groundY - it.r * 2 - LABEL_H / 2 - 3 - Math.min(it.headroom || 0, MAX_HEADROOM);
-  const above = [{ x: it.x, y: ay }, { x: it.x - w * 0.4, y: ay }, { x: it.x + w * 0.4, y: ay }];
-  return it.above ? [...above, ...below] : [...below, ...above];
+export function shortLabel(text, maxWidth, measure) {
+  if (measure(text) <= maxWidth) return text;
+  const words = String(text).trim().split(/\s+/);
+  if (words.length > 1) {
+    const tail = `…${words[words.length - 1]}`;
+    if (measure(tail) <= maxWidth) return tail;
+  }
+  return truncateMiddle(text, maxWidth, measure);
+}
+
+/** How far (in the critter's radii) a label may move from its default spot. */
+export const MAX_SHIFT = 1;
+
+/** A label's default spot: under the feet, or just over the head for bell queuers. */
+export function homeSpot(it) {
+  if (it.above) return { x: it.x, y: it.groundY - it.r * 2 - LABEL_H / 2 - 3 - Math.min(it.headroom || 0, MAX_HEADROOM) };
+  return { x: it.x, y: it.groundY + 10 };
 }
 
 /**
- * @param {Array<{ id: string, text: string, x: number, groundY: number, r: number, status?: string, above?: boolean, headroom?: number, parent?: boolean, body?: {cx:number,cy:number,cr:number} }>} items
+ * Candidate label centres: the default spot, then small nudges that keep the
+ * name within MAX_SHIFT radii of it, so you can always tell whose name it is
+ * (a name far from its critter is worse than a faded one).
+ */
+function candidates(it) {
+  const home = homeSpot(it);
+  const d = it.r * MAX_SHIFT;
+  const away = it.above ? -1 : 1; // nudge away from the body, never into it
+  // A small grid of nudges (sideways, and away from the body), nearest first,
+  // keeping only those within d of the default spot.
+  const out = [];
+  for (const fy of [0, 0.5, 0.8, 1]) {
+    for (const fx of [0, -0.5, 0.5, -1, 1]) {
+      const o = { x: fx * d, y: away * fy * d };
+      if (Math.hypot(o.x, o.y) <= d + 1e-9) out.push(o);
+    }
+  }
+
+  return out.map((o) => ({ x: home.x + o.x, y: home.y + o.y }));
+}
+
+/**
+ * @param {Array<{ id: string, text: string, x: number, groundY: number, r: number, status?: string, above?: boolean, headroom?: number, parent?: boolean, short?: string, body?: {cx:number,cy:number,cr:number} }>} items
+ *   `short` is a shorter form of `text` to try before giving up on a clear spot
  * @param {(text: string, item?: object) => number} measure text width in px (item carries e.g. a font)
  * @param {Array<{l:number,r:number,t:number,b:number}>} [blocked] areas labels must avoid
- * @returns {Array<{ id: string, text: string, x: number, y: number, visible: boolean, box: {l:number,r:number,t:number,b:number} }>}
- *   in placement order; a label with no clear spot keeps its first choice and `visible: false`
+ * @returns {Array<{ id: string, text: string, x: number, y: number, home: {x:number,y:number}, visible: boolean, box: {l:number,r:number,t:number,b:number} }>}
+ *   in placement order; a label with no clear spot within MAX_SHIFT stays at `home` with `visible: false`
  */
 export function placeLabels(items, measure, blocked = []) {
   const rank = (s) => { const i = LABEL_PRIORITY.indexOf(s); return i < 0 ? LABEL_PRIORITY.length : i; };
@@ -89,14 +119,24 @@ export function placeLabels(items, measure, blocked = []) {
   const taken = [...blocked, ...bodies];
   const out = [];
   for (const it of order) {
-    const w = measure(it.text, it) + 6;
-    const boxAt = (p) => ({ l: p.x - w / 2, r: p.x + w / 2, t: p.y - LABEL_H / 2, b: p.y + LABEL_H / 2 });
-    const spots = candidates(it, w);
-    const free = spots.find((p) => !taken.some((o) => overlaps(boxAt(p), o)));
-    const at = free || spots[0];
-    const box = boxAt(at);
-    if (free) taken.push(box);
-    out.push({ id: it.id, text: it.text, x: at.x, y: at.y, visible: !!free, box });
+    const spots = candidates(it);
+    // Try the full name near its owner, then the short form (if any) near its owner.
+    let placed = null;
+    for (const text of it.short && it.short !== it.text ? [it.text, it.short] : [it.text]) {
+      const w = measure(text, it) + 6;
+      const boxAt = (p) => ({ l: p.x - w / 2, r: p.x + w / 2, t: p.y - LABEL_H / 2, b: p.y + LABEL_H / 2 });
+      const free = spots.find((p) => !taken.some((o) => overlaps(boxAt(p), o)));
+      if (free) { placed = { text, at: free, box: boxAt(free) }; break; }
+    }
+    if (placed) {
+      taken.push(placed.box);
+      out.push({ id: it.id, text: placed.text, x: placed.at.x, y: placed.at.y, home: spots[0], visible: true, box: placed.box });
+    } else {
+      // Nowhere close is clear: stay at the default spot, faded (hover restores it).
+      const w = measure(it.text, it) + 6, h = spots[0];
+      const box = { l: h.x - w / 2, r: h.x + w / 2, t: h.y - LABEL_H / 2, b: h.y + LABEL_H / 2 };
+      out.push({ id: it.id, text: it.text, x: h.x, y: h.y, home: h, visible: false, box });
+    }
   }
   return out;
 }

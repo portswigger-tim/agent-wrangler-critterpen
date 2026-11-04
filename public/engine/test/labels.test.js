@@ -1,35 +1,44 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { placeLabels, visibleOverlaps } from '../labels.js';
+import { placeLabels, visibleOverlaps, shortLabel, MAX_SHIFT, SHORT_FRACTION } from '../labels.js';
 import { islandSize, islandPoint, homeSpots } from '../layout.js';
-import { createWander, stepWander, separate, wanderPace } from '../wander.js';
-import { rng, truncateToWidth } from '../util.js';
+import { createWander, stepWander, separate, wanderPace, PERSONAL_SPACE, DEPTH_WEIGHT } from '../wander.js';
+import { rng, truncateMiddle as shorten } from '../util.js';
 
 const measure = (t) => t.length * 6.2; // ~11px system-ui
 const NAMES = ['Refactor cart service', 'Investigate CI timeouts', 'Fix flaky payment tests', 'Critter Pen PM',
   'Wrangler adapter', 'Build animation engine', 'Write API reference', 'Migrate docs to Astro'];
 
-test('wandering crowds never show two overlapping labels, and most stay readable', () => {
-  const r = 20, labelWidth = Math.min(120, Math.max(56, r * 4.4));
+test('wandering crowds: no overlapping labels, every name near its owner, most readable', () => {
+  const r = 20, labelWidth = Math.min(150, Math.max(110, r * 6)); // as computeLayout
+  const pt = (i) => islandPoint(isl, crowd[i].w.u, crowd[i].w.v, r);
+  let isl, crowd;
   for (const k of [3, 5, 7]) {
     const size = islandSize(k, r);
-    const isl = { cx: 500, cy: 300, rx: size.rx, ry: size.ry };
+    isl = { cx: 500, cy: 300, rx: size.rx, ry: size.ry };
     const rand = rng(k * 31);
-    const crowd = homeSpots(k, 77).map((p, i) => ({
+    crowd = homeSpots(k, 77).map((p, i) => ({
       w: createWander(p.u, p.v, rand),
-      text: truncateToWidth(NAMES[i % NAMES.length], labelWidth, measure),
+      text: shorten(NAMES[i % NAMES.length], labelWidth, measure),
+      short: shortLabel(NAMES[i % NAMES.length], labelWidth * SHORT_FRACTION, measure),
       status: ['working', 'thinking', 'idle'][i % 3],
     }));
     let shown = 0, total = 0;
     for (let step = 0; step < 3000; step++) {
       for (const c of crowd) stepWander(c.w, 1 / 30, rand, wanderPace(c.status));
-      separate(crowd.map((c) => c.w), r * 2.5, isl.rx - r * 0.9, (isl.ry - r * 0.4) * 0.75, 0.6);
+      separate(crowd.map((c) => c.w), r * PERSONAL_SPACE, isl.rx - r * 0.9, (isl.ry - r * 0.4) * DEPTH_WEIGHT, 0.6);
       if (step % 10) continue;
       const placed = placeLabels(crowd.map((c, i) => {
-        const p = islandPoint(isl, c.w.u, c.w.v, r);
-        return { id: `c${i}`, text: c.text, x: p.x, groundY: p.y, r, status: c.status };
+        const p = pt(i);
+        return { id: `c${i}`, text: c.text, short: c.short, x: p.x, groundY: p.y, r, status: c.status };
       }), measure);
       assert.deepEqual(visibleOverlaps(placed), [], `k=${k} step ${step}`);
+      for (const l of placed) {
+        const moved = Math.hypot(l.x - l.home.x, l.y - l.home.y);
+        assert.ok(moved <= r * MAX_SHIFT + 1e-6, `k=${k} step ${step}: ${l.id}'s name strayed ${moved.toFixed(1)}px`);
+        const own = pt(Number(l.id.slice(1)));
+        assert.ok(Math.abs(l.x - own.x) <= r * MAX_SHIFT + 1e-6 && l.y - own.y <= 10 + r * MAX_SHIFT + 1e-6, `${l.id} stays with its owner`);
+      }
       shown += placed.filter((p) => p.visible).length;
       total += placed.length;
     }
@@ -52,10 +61,15 @@ test('bell queuers put their names above their heads, clear of the building capt
   const caption = { l: 480, r: 520, t: 704, b: 718 }; // the "you" caption under the bell
   const [l] = placeLabels([{ id: 'q', text: 'Write API reference', x: 500, groundY: 700, r: 20, status: 'needs-you', above: true }], measure, [caption]);
   assert.ok(l.visible && l.y < 700 - 40, `label at ${l.y}`);
-  // Without the hint it still avoids the caption.
-  const [m] = placeLabels([{ id: 'm', text: 'Somebody', x: 500, groundY: 695, r: 20, status: 'working' }], measure, [caption]);
-  assert.ok(m.visible);
-  assert.ok(m.box.b <= caption.t || m.box.t >= caption.b || m.box.r <= caption.l || m.box.l >= caption.r);
+  // Without the hint a visible name never covers the caption; hemmed in, it
+  // stays home faded rather than wandering off.
+  for (const gy of [695, 640]) {
+    const [m] = placeLabels([{ id: 'm', text: 'Somebody', x: 500, groundY: gy, r: 20, status: 'working' }], measure, [caption]);
+    if (m.visible) assert.ok(m.box.b <= caption.t || m.box.t >= caption.b || m.box.r <= caption.l || m.box.l >= caption.r);
+    else assert.deepEqual([m.x, m.y], [m.home.x, m.home.y]);
+  }
+  const [free] = placeLabels([{ id: 'f', text: 'Somebody', x: 500, groundY: 640, r: 20, status: 'working' }], measure, [caption]);
+  assert.ok(free.visible, 'a name with room shows');
 });
 
 test('placement is deterministic', () => {
@@ -134,5 +148,16 @@ test('names never sit on another critter\'s body', () => {
       assert.ok(!(p.box.l < b.r && p.box.r > b.l && p.box.t < b.b && p.box.b > b.t), `${p.id}'s name covers ${it.id}`);
     }
   }
-  assert.ok(placed.every((p) => p.visible), 'both still find a spot');
+  // The front critter keeps its name; the one behind may fade, but stays home.
+  assert.ok(placed.find((p) => p.id === 'front').visible);
+  for (const p of placed.filter((q) => !q.visible)) assert.deepEqual([p.x, p.y], [p.home.x, p.home.y]);
+});
+
+test('short forms keep the distinguishing last word', () => {
+  const m = (t) => t.length * 7;
+  assert.equal(shortLabel('Investigate CI timeouts', 70, m), '…timeouts');
+  assert.equal(shortLabel('Wrangler adapter', 70, m), '…adapter');
+  assert.equal(shortLabel('PM', 70, m), 'PM');
+  const long = shortLabel('Supercalifragilistic', 70, m);
+  assert.ok(m(long) <= 70 && long.includes('…'));
 });

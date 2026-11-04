@@ -90,10 +90,11 @@ export function separate(list, minDist, ax, ay, strength = 0.5) {
 
 /**
  * Personal space, in critter radii, between two critters' feet. Bodies are at
- * most ~1.08r wide each (size jitter, squash, breathing), so 2.5r keeps them
- * from ever touching, standing still or strolling.
+ * most ~1.08r wide each (size jitter, squash, breathing), so this keeps them
+ * from ever touching, and 3r also leaves room for each name to sit right
+ * under its own critter.
  */
-export const PERSONAL_SPACE = 2.5;
+export const PERSONAL_SPACE = 3;
 
 /** How many world px one disk unit spans across (ax) and deep (ay) on an island. */
 export const islandAxes = (isl, r) => ({ ax: Math.max(1, isl.rx - r * 0.9), ay: Math.max(1, isl.ry - r * 0.4) });
