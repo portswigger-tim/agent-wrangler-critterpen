@@ -27,8 +27,12 @@
 <div class="panel" data-theme="dark"><canvas></canvas></div>
 <div class="panel" data-theme="light"><canvas></canvas></div>
 <script type="module">
-import { ISLET_KINDS, drawServiceBuilding, drawCaptionPlank, drawIslet } from './buildings.js';
-import { readTheme } from './color.js';
+import {
+  ISLET_KINDS, drawServiceBuilding, drawCaptionPlank, drawIslet, drawCarrier, bellQueueSlots,
+  PHONE_HOLDER_SLOT, phoneSocket, receiverSpot, drawPhoneReceiver,
+} from './buildings.js';
+import { readTheme, statusColor } from './color.js';
+import { drawCritter, drawShadow } from './art.js';
 import { drawSky } from './ambient.js';
 import { haloText } from './art.js';
 
@@ -40,6 +44,27 @@ const S = +(q.get('scale') || 0.62);
 const CAPTION = { git: 'git', pr: 'PRs', jira: 'Jira', terminal: 'shell', web: 'web', files: 'files', human: 'you' };
 
 const panels = [...document.querySelectorAll('.panel')].map((el) => ({ el, canvas: el.querySelector('canvas') }));
+
+/** A bigger phone-box islet on the left with a needs-you queue; slot 0 holds the receiver. */
+function drawQueue(ctx, x, y, scale, pal, t, hit) {
+  const r = 18 * scale;
+  const base = drawCarrier(ctx, 'islet', 'human', x, y, scale, pal, t);
+  drawServiceBuilding(ctx, 'human', base.x, base.y, scale, pal, t, { hit, waiting: 1 });
+  const all = bellQueueSlots(scale, r).slice(0, 6);
+  const front = all[PHONE_HOLDER_SLOT];
+  for (const sl of [...all].sort((a, b) => a.dy - b.dy)) { // back row first
+    const gx = base.x + sl.dx, gy = base.y + sl.dy, holder = sl === front;
+    drawShadow(ctx, gx, gy, r, 0, pal);
+    drawCritter(ctx, {
+      x: gx, y: gy, r, color: statusColor('needs-you', pal), eyes: holder ? 'open' : 'wide', mouth: holder ? 'o' : 'smile',
+      lookX: -sl.side * 0.8, lookY: -0.1, blink: 1, tint: { r: 217, g: 119, b: 87, a: 1 }, wave: holder ? null : -0.5,
+    }, pal, t);
+    if (holder) {
+      const so = phoneSocket(scale), rs = receiverSpot(r, sl.side);
+      drawPhoneReceiver(ctx, base.x + so.dx * sl.side, base.y + so.dy, gx + rs.dx, gy + rs.dy, scale, pal, t);
+    }
+  }
+}
 
 function frame(ms) {
   const t = frozen ?? ms / 1000;
@@ -58,8 +83,9 @@ function frame(ms) {
       const hit = fixedHit ?? Math.max(0, 1 - since / 1.4);
       const x = gap * (i + 0.5);
       drawServiceBuilding(ctx, kind, x, H * 0.36, S, pal, t, { hit, waiting });
-      drawCaptionPlank(ctx, x, H * 0.36 + 8, CAPTION[kind], pal, 1);
-      drawIslet(ctx, kind, x, H * 0.8, S * 0.8, pal, t, { hit, waiting, caption: undefined });
+      drawCaptionPlank(ctx, x, H * 0.36 + 8, CAPTION[kind], pal, 1, { kind });
+      if (kind === 'human' && waiting > 0) drawQueue(ctx, x - gap * 0.25, H * 0.8, S, pal, t, hit);
+      else drawIslet(ctx, kind, x, H * 0.8, S * 0.8, pal, t, { hit, waiting, caption: CAPTION[kind] });
     });
     haloText(ctx, el.dataset.theme, 30, 14, pal, 0.5);
   }
