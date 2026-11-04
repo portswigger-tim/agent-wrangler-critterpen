@@ -28,8 +28,10 @@ every 2 s using only today's host API:
    later.
 2. **Which transcript.** Claude writes a session's transcript to
    `~/.claude/projects/<slug>/<conversation>.jsonl`, where `<slug>` is the cwd
-   with every character outside `[A-Za-z0-9]` replaced by `-`
-   (`$CLAUDE_CONFIG_DIR` replaces `~/.claude` when set). The newest `.jsonl` in that
+   with every character outside `[A-Za-z0-9]` replaced by `-`. A slug over 200
+   characters is cut to 200 and gets `-` plus the base-36 Java-style string hash of the
+   cwd, which worktree paths reach easily. `$CLAUDE_CONFIG_DIR` replaces `~/.claude`
+   when it's set. The newest `.jsonl` in that
    folder is the card's live conversation, including after a resume, which
    starts a new file.
 3. **Honest attribution.** If two active cards share a cwd, which happens

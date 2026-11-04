@@ -23,8 +23,20 @@ export function claudeProjectsDir(env = process.env) {
   return path.join(env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'), 'projects');
 }
 
-// Claude Code's project folder name for a cwd.
-export const cwdSlug = (cwd) => cwd.replace(/[^A-Za-z0-9]/g, '-');
+// Claude Code's project folder name for a cwd: every non-alphanumeric becomes
+// '-', and a name over 200 characters is cut to 200 plus '-' and the base-36
+// Java-style string hash of the cwd itself (worktree and session paths reach
+// that length easily).
+const MAX_SLUG = 200;
+function javaHash(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return h;
+}
+export function cwdSlug(cwd) {
+  const slug = cwd.replace(/[^A-Za-z0-9]/g, '-');
+  return slug.length <= MAX_SLUG ? slug : `${slug.slice(0, MAX_SLUG)}-${Math.abs(javaHash(cwd)).toString(36)}`;
+}
 
 // Cards worth watching: live Claude cards whose cwd no other active card shares.
 export function watchableCards(sessions) {
