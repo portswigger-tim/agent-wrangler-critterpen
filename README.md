@@ -29,6 +29,10 @@ PR mailbox, a ticket at the Jira post office.
   with its red phone box sits front and centre: critters that need you hop over and
   queue outside, the front one holding the receiver, and the phone rings while anyone
   waits.
+- **Keepers:** each service islet (not the phone box) has a little keeper standing in
+  front of its building that catches what's thrown at it: it opens wide as a commit,
+  plane or ticket arrives, chomps, and looks round-bellied and full after a quick
+  burst. Hover one for its name ("git keeper"); they aren't clickable.
 - **A steady view:** nothing moves the scene but a resize of the pen. Islands and islets
   stay exactly where they are as sessions change status, do things, spawn or finish. A
   new task's island appears in free space; a closed task's island fades where it was
