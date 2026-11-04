@@ -4,7 +4,7 @@
 //
 // The building is kept apart from whatever carries it, so the carrier can be
 // swapped: drawServiceBuilding() draws only the building at a base point;
-// drawCarrier() draws what it stands on (only 'islet' so far, provisional).
+// drawCarrier() draws what it stands on ('islet'; other skins could follow).
 //
 // Coordinates: (x, y) is the base point the building stands on. `scale` 1
 // suits a ~18px critter radius. Draw-only, plus pure helpers for layout/tests.
@@ -36,7 +36,7 @@ const TOP = { // islet top ellipse (px at scale 1)
 const HEIGHT = { git: 50, pr: 40, jira: 44, terminal: 46, web: 52, files: 34, human: 48 }; // building, in units
 
 /**
- * Provisional ('islet' carrier). Space an islet needs, in px at `scale`, measured from its (x, y):
+ * Space an islet needs, in px at `scale`, measured from its (x, y):
  * `rx`/`ry` the top surface, `top` how far the building (and balloon or smoke)
  * rises, `bottom` how far the underside and hanging sign fall. `r` is a
  * bounding radius around (x, y - (top - bottom) / 2), for circle packing.
@@ -50,7 +50,7 @@ export function isletFootprint(kind, scale = 1) {
   return { rx: rx * scale, ry: ry * scale, top: top * scale, bottom: bottom * scale, r: r * scale, cy: -((top - bottom) / 2) * scale };
 }
 
-/** Provisional ('islet' carrier). Vertical bob at time t (each kind its own rhythm); 0 under reduced motion. */
+/** Islet bob at time t (each kind its own rhythm); 0 under reduced motion. */
 export function isletBob(kind, t, scale = 1, reduced = false) {
   if (reduced) return 0;
   const r = rng(hash32('islet-bob:' + kind));
@@ -482,8 +482,8 @@ export function drawCaptionPlank(ctx, x, y, text, pal, scale = 1) {
 }
 
 /**
- * Draw what a building stands on. Only 'islet' exists (provisional, pending
- * the carrier decision). Returns the base point for the building.
+ * Draw what a building stands on. Only 'islet' exists; satellites or airships
+ * could be added as other carriers. Returns the base point for the building.
  * @returns {{ x: number, y: number, captionY: number }}
  */
 export function drawCarrier(ctx, carrier, kind, x, y, scale, pal, t, { reduced = false, alpha = 1 } = {}) {

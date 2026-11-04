@@ -46,7 +46,7 @@ cd public/engine && npm test   # node --test, no dependencies
 | `art.js` | Vector drawing: critters (eyes, lids, mouths), accessories, bubbles, projectiles |
 | `behaviour.js` | Personality: rare, seeded, deterministic idle behaviours and pose modifiers |
 | `ambient.js` | Sky, fireflies (dark) and petals/motes (light); stateless |
-| `buildings.js` | Service buildings (bigger, with hit animations and plank captions), kept apart from their carrier (provisional islets) |
+| `buildings.js` | Service buildings (bigger, with hit animations and plank captions), kept apart from their carrier (floating islets) |
 | `scene.js` | Scenery: floating islands, name planks, the mainland and its buildings |
 | `layout.js` | Pure layout: island sizing and packing, home spots, landmark positions, compact tray rows |
 | `wander.js` | Pure movement: wandering an island, personal space, the bell queue |
