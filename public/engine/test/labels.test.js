@@ -23,7 +23,7 @@ test('wandering crowds never show two overlapping labels, and most stay readable
     let shown = 0, total = 0;
     for (let step = 0; step < 3000; step++) {
       for (const c of crowd) stepWander(c.w, 1 / 30, rand, wanderPace(c.status));
-      separate(crowd.map((c) => c.w), r * 2.7, isl.rx - r * 0.9, (isl.ry - r * 0.4) * 0.5, 0.35);
+      separate(crowd.map((c) => c.w), r * 2.5, isl.rx - r * 0.9, (isl.ry - r * 0.4) * 0.75, 0.6);
       if (step % 10) continue;
       const placed = placeLabels(crowd.map((c, i) => {
         const p = islandPoint(isl, c.w.u, c.w.v, r);
@@ -70,4 +70,33 @@ test('a label placed above the head clears the headroom of a hat or bubble', () 
   const [raised] = placeLabels([{ ...base, headroom: 30 }], measure);
   assert.equal(plain.y - raised.y, 30);
   assert.ok(raised.box.b < 700 - 18 * 2 - 30, 'label bottom sits above head + headroom');
+});
+
+import { stripTaskPrefix } from '../labels.js';
+import { truncateMiddle } from '../util.js';
+
+test('labels drop a leading copy of the task name, loosely matched', () => {
+  const cases = [
+    ['Safer-runner-action Ubuntu 26.04 sudo-rs fix', 'Safer Runner', 'Ubuntu 26.04 sudo-rs fix'],
+    ['Safer-runner-action L7 mitmproxy', 'Safer Runner', 'L7 mitmproxy'],
+    ['Checkout revamp: fix tax', 'Checkout revamp', 'fix tax'],
+    ['checkout_REVAMP - fix tax', 'Checkout revamp', 'fix tax'],
+    ['Checkout revampery', 'Checkout revamp', 'Checkout revampery'], // not a word boundary
+    ['Checkout revamp', 'Checkout revamp', 'Checkout revamp'], // never down to nothing
+    ['Checkout revamp:  ', 'Checkout revamp', 'Checkout revamp:  '],
+    ['Fix flaky tests', 'Checkout revamp', 'Fix flaky tests'],
+    ['Anything', '', 'Anything'],
+  ];
+  for (const [name, task, want] of cases) assert.equal(stripTaskPrefix(name, task), want, `${name} / ${task}`);
+});
+
+test('middle ellipsis keeps the distinguishing tail', () => {
+  const m = (t) => t.length * 6;
+  const a = truncateMiddle('Safer-runner-action Ubuntu 26.04 sudo-rs fix', 100, m);
+  const b = truncateMiddle('Safer-runner-action L7 mitmproxy', 100, m);
+  assert.ok(m(a) <= 100 && m(b) <= 100);
+  assert.notEqual(a, b, 'two sessions stay distinguishable');
+  assert.ok(a.endsWith('fix') && b.endsWith('mitmproxy'));
+  assert.equal(truncateMiddle('short', 100, m), 'short');
+  assert.equal(truncateMiddle('anything', 2, m), '');
 });

@@ -118,6 +118,30 @@ export function truncateToWidth(text, maxWidth, measure) {
   return text.slice(0, lo).trimEnd() + ell;
 }
 
+/**
+ * Like truncateToWidth, but cuts from the middle so both ends survive: the
+ * tail of a session name is often what tells two apart.
+ * @param {string} text
+ * @param {number} maxWidth
+ * @param {(s: string) => number} measure
+ */
+export function truncateMiddle(text, maxWidth, measure) {
+  if (measure(text) <= maxWidth) return text;
+  const ell = '…';
+  if (measure(ell) > maxWidth) return '';
+  const fit = (n) => {
+    const head = Math.ceil(n * 0.4), tail = n - head;
+    return text.slice(0, head).trimEnd() + ell + (tail ? text.slice(text.length - tail).trimStart() : '');
+  };
+  let lo = 0, hi = text.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (measure(fit(mid)) <= maxWidth) lo = mid;
+    else hi = mid - 1;
+  }
+  return fit(lo);
+}
+
 /** Point on a quadratic bezier. */
 export function quad(p0, p1, p2, t) {
   const u = 1 - t;

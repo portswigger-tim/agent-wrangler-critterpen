@@ -2,12 +2,12 @@
 // Canvas 2D, one requestAnimationFrame loop, no dependencies, no wrangler knowledge.
 
 import { LANDMARK_KINDS, STATUSES, isPenEvent } from './contract.js';
-import { critterTraits, rng, clamp, lerp, ease, springStep, truncateToWidth, quad, quadAngle, arcControl, TAU } from './util.js';
+import { critterTraits, rng, clamp, lerp, ease, springStep, truncateToWidth, truncateMiddle, quad, quadAngle, arcControl, TAU } from './util.js';
 import { readTheme, toCss, mix, lighten, darken, statusColor } from './color.js';
-import { computeLayout, islandPoint, LANDMARK_LABELS } from './layout.js';
-import { createWander, stepWander, wanderPace, separate, bellSlot } from './wander.js';
-import { drawIsland, drawSignpost, drawMainland, drawBuilding } from './scene.js';
-import { placeLabels } from './labels.js';
+import { computeLayout, islandPoint, pickAt, LANDMARK_LABELS } from './layout.js';
+import { createWander, stepWander, wanderPace, separate, bellSlot, islandAxes, PERSONAL_SPACE, DEPTH_WEIGHT } from './wander.js';
+import { drawIsland, drawSignpost, drawMainland, drawBuilding, drawLeash } from './scene.js';
+import { placeLabels, stripTaskPrefix } from './labels.js';
 import { diffCritters } from './diff.js';
 import {
   ACCESSORIES, agentTint, kindColor, drawCritter, drawShadow, drawBubble, drawThinkingDots,
@@ -23,6 +23,7 @@ import { drawAmbient, drawSky } from './ambient.js';
 
 const STATUS_BLEND = 0.45; // seconds to cross-fade pose + colour on status change
 const FONT_NAME = '700 12px system-ui, -apple-system, Segoe UI, sans-serif'; // labels.js LABEL_H matches
+const FONT_NAME_PARENT = '800 12px system-ui, -apple-system, Segoe UI, sans-serif'; // parents read a touch bolder
 const FONT_TASK = '700 10px system-ui, -apple-system, Segoe UI, sans-serif';
 const FONT_FLOAT = '700 11px system-ui, -apple-system, Segoe UI, sans-serif';
 
@@ -187,7 +188,11 @@ export function createPen(el, opts = {}) {
     for (const [id, slot] of layout.slots) {
       const s = sprites.get(id);
       if (!s) continue;
-      s.homeR = slot.r * s.sizeJitter;
+      // Size by role: parents big, children small. s.r springs to it, so a
+      // child arriving or leaving eases the parent's size instead of popping.
+      s.role = slot.role || 'solo';
+      s.roleScale = slot.scale ?? 1;
+      s.homeR = slot.r * s.sizeJitter * s.roleScale;
       // ── islands / wander ── keep wandering where it was unless the task changed.
       const spot = layout.spots?.get(id);
       if (spot && (!s.wander || s.home?.taskId !== spot.taskId)) {
@@ -401,14 +406,25 @@ export function createPen(el, opts = {}) {
     for (const s of sprites.values()) {
       if (!s.wander || s.life !== 'live' || s.place !== 'island' || s.hop) continue;
       if (!byIsland.has(s.home.taskId)) byIsland.set(s.home.taskId, []);
+      s.wander.rad = s.r.x; // bigger critters keep more room
+      s.wander.m = s.role === 'parent' ? 0.15 : 1; // and parents hold their ground
       byIsland.get(s.home.taskId).push(s.wander);
     }
     for (const [id, list] of byIsland) {
       const v = islandViz.get(id);
-      // Depth counts for less than width: a critter standing behind another is
-      // hidden by it unless they're well apart front-to-back.
-      if (v && list.length > 1) separate(list, layout.radius * 2.7, Math.max(1, v.rx - layout.radius * 0.9), Math.max(1, v.ry - layout.radius * 0.4) * 0.5, 0.35);
+      if (v && list.length > 1) {
+        const { ax, ay } = islandAxes(v, layout.radius);
+        separate(list, layout.radius * PERSONAL_SPACE, ax, ay * DEPTH_WEIGHT, 0.6);
+      }
     }
+  }
+
+  /** Where a critter's strolls centre: parents near the middle, children near their parent. */
+  function wanderAround(s) {
+    if (s.role === 'parent') return { u: 0, v: 0, rad: 0.3 };
+    const p = s.role === 'child' && sprites.get(s.data.parentId);
+    if (p?.wander && p.home?.taskId === s.home?.taskId && p.place === 'island') return { u: p.wander.u, v: p.wander.v, rad: 0.45 };
+    return null;
   }
 
   /** Building captions and island name planks: places name labels must not cover. */
@@ -496,7 +512,7 @@ export function createPen(el, opts = {}) {
       let place = 'home';
       const iv = s.home && islandViz.get(s.home.taskId);
       if (iv) {
-        if (!reduced && !s.hop) stepWander(s.wander, dt, s.rand, wanderPace(s.status));
+        if (!reduced && !s.hop) stepWander(s.wander, dt, s.rand, { ...wanderPace(s.status), around: wanderAround(s) });
         const p = islandPoint(iv, s.wander.u, s.wander.v, s.r.x);
         tx = p.x; ty = p.y + iv.bob;
         place = 'island';
@@ -896,25 +912,15 @@ export function createPen(el, opts = {}) {
       list.push({ s, pose, r });
     }
 
-    // Leashes between parents and children.
-    ctx.save();
-    ctx.setLineDash([2, 5]);
-    ctx.lineCap = 'round';
-    ctx.lineWidth = 1.6;
-    if (!reduced) ctx.lineDashOffset = -time * 12;
+    // ── islands / wander ── leashes: a rope from parent to child, over the
+    // islands and under the critters.
     for (const { s } of list) {
       const pid = s.data.parentId;
       const p = pid && sprites.get(pid);
       if (!p || p.age < 0 || p.life === 'gone') continue;
-      const a = Math.min(s.alpha, p.alpha);
-      ctx.strokeStyle = toCss(pal.fg, 0.32 * a);
-      const mx = (p.cx + s.cx) / 2, my = Math.max(p.cy, s.cy) + Math.max(14, Math.abs(p.cx - s.cx) * 0.2);
-      ctx.beginPath();
-      ctx.moveTo(p.cx, p.cy + p.cr * 0.4);
-      ctx.quadraticCurveTo(mx, my, s.cx, s.cy + s.cr * 0.4);
-      ctx.stroke();
+      drawLeash(ctx, { x: p.cx, y: p.cy + p.cr * 0.45 }, { x: s.cx, y: s.cy + s.cr * 0.45 }, pal,
+        Math.min(s.alpha, p.alpha), reduced ? 0 : time * 0.5);
     }
-    ctx.restore();
 
     list.sort((a, b) => a.s.y.x - b.s.y.x);
     const hoverSprite = hovered ? sprites.get(hovered) : null;
@@ -962,23 +968,29 @@ export function createPen(el, opts = {}) {
 
       // Name label (the hovered critter's full name is in the tooltip, and
       // its neighbours' labels step back so nothing collides).
-      if (s.labelFor !== s.data.name + '|' + labelWidth) {
-        ctx.font = FONT_NAME;
-        s.label = truncateToWidth(s.data.name || s.id, labelWidth, (t) => ctx.measureText(t).width);
-        s.labelFor = s.data.name + '|' + labelWidth;
+      const font = s.role === 'parent' ? FONT_NAME_PARENT : FONT_NAME;
+      const labelKey = `${s.data.name}|${s.data.taskName}|${labelWidth}|${font}`;
+      if (s.labelFor !== labelKey) {
+        // The island plank already names the task; keep the part that tells
+        // sessions apart, cutting from the middle if it still doesn't fit.
+        ctx.font = font;
+        s.label = truncateMiddle(stripTaskPrefix(s.data.name || s.id, s.data.taskName), labelWidth, (t) => ctx.measureText(t).width);
+        s.labelFor = labelKey;
       }
       if (!layout.compact && hovered !== s.id) {
         const near = hoverSprite && Math.abs(hoverSprite.y.x - groundY) < 30 && Math.abs(hoverSprite.x.x - s.x.x) < labelWidth * 1.5;
-        labels.push({ id: s.id, text: s.label, x: s.x.x, groundY, r, status: s.status, above: s.place === 'bell', headroom: headroomOf(s, r), alpha: (s.status === 'asleep' ? 0.6 : 0.85) * a * (near ? 0.2 : 1) });
+        labels.push({ id: s.id, text: s.label, x: s.x.x, groundY, r, status: s.status, above: s.place === 'bell', parent: s.role === 'parent', font, headroom: headroomOf(s, r), alpha: (s.status === 'asleep' ? 0.6 : 0.85) * a * (near ? 0.2 : 1) });
       }
     }
 
     // ── islands / wander ── name labels over all critters, placed most
     // important first (labels.js); one with no clear spot steps back to a whisper.
     ctx.font = FONT_NAME;
-    const alphaOf = new Map(labels.map((l) => [l.id, l.alpha]));
-    for (const l of placeLabels(labels, (t) => ctx.measureText(t).width, labelObstacles())) {
-      haloText(ctx, l.text, l.x, l.y, pal, alphaOf.get(l.id) * (l.visible ? 1 : 0.12), FONT_NAME);
+    const byId = new Map(labels.map((l) => [l.id, l]));
+    const measure = (t, it) => { ctx.font = it?.font || FONT_NAME; return ctx.measureText(t).width; };
+    for (const l of placeLabels(labels, measure, labelObstacles())) {
+      const it = byId.get(l.id);
+      haloText(ctx, l.text, l.x, l.y, pal, it.alpha * (l.visible ? 1 : 0.12), it.font);
     }
 
     // Particles.
@@ -1148,14 +1160,8 @@ export function createPen(el, opts = {}) {
 
   function pick(ev) {
     const rect = canvas.getBoundingClientRect();
-    const x = ev.clientX - rect.left, y = ev.clientY - rect.top;
-    let best = null, bestD = Infinity;
-    for (const s of sprites.values()) {
-      if (s.life === 'leave' || s.life === 'gone' || s.age < 0) continue;
-      const d = Math.hypot(x - s.cx, y - s.cy);
-      if (d < s.cr * 1.25 && d < bestD) { best = s; bestD = d; }
-    }
-    return best;
+    const live = [...sprites.values()].filter((s) => s.life !== 'leave' && s.life !== 'gone' && s.age >= 0);
+    return pickAt(live, ev.clientX - rect.left, ev.clientY - rect.top);
   }
   const onMove = (ev) => {
     const rect = canvas.getBoundingClientRect();

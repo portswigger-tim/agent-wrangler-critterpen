@@ -35,7 +35,8 @@ name label underneath (session title, truncated). Agent type tints the eyes/acce
 
 ### Layout: floating islands
 
-Each **task is a floating island**: a soft, organic grassy blob with a craggy earth
+Each **task is a floating island**: a soft, organic blob of sage/straw-moss grass (kept
+clearly away from status green, so working critters stand out) with a craggy earth
 underside and dangling roots, bobbing gently in the sky. The task name hangs on a
 wooden plank on the island's cliff face. Islands size themselves to their critter count
 (`layout.islandSize`) and are packed across the sky with gaps between them
@@ -46,10 +47,30 @@ fit, everything shrinks a little. Sessions with no task get a small **rocky isle
 
 Critters **wander** their own island in island-local coordinates (`wander.js`), so a
 critter can never step off it: brisk strolls when working, slow ambles when thinking or
-idle, and staying put when finished, asleep or in error. A little personal space keeps
-them from standing inside each other. Name labels are drawn above everything, front-most
-first, and a label that would land on another fades to a whisper. Parent/child sessions
-(spawned/nested) are linked by a thin dotted "leash", across islands too.
+idle, and staying put when finished, asleep or in error. **Personal space**
+(`PERSONAL_SPACE`, 2.5 radii between feet, with depth weighted at 0.75 so a hopping
+front critter clears the one behind) keeps bodies apart while strolling and at rest:
+home spots are relaxed apart in the layout too, so reduced motion and the first frame
+are just as tidy.
+
+**Size by role** (`layout.roleScales`): a critter with at least one child on the pen is
+a *parent* at 1.35×, one whose parent is on the pen is a *child* at 0.8×, the rest are
+1×; a child that is itself a parent is parent-sized. Parents take the home spot nearest
+the island's middle and hold it (they yield little to personal-space pushes), their
+children take the spots around them and stroll near them. Size eases on change; the
+hit target scales with size, so parents are the easiest to click. Islands are sized by
+the room their crowd needs (Σ scale²).
+
+**Name labels** (`labels.js`) drop a leading copy of the task name (matched loosely)
+and cut long names in the middle. They are placed above everything in priority order
+(needs-you > finished > working > thinking > error > idle > asleep; parents first among
+equals, in bolder type; then front-most), each trying under the feet, a line lower,
+sideways or above the head, avoiding building captions and name planks; a label with no
+clear spot fades to a whisper.
+
+**Leashes** are a little rope (about 2.4px, earthy: light tan on dark themes, dark brown
+on light, over a contrasting halo) from parent to child, drawn above the islands and
+below the critters with a slight catenary sag, across islands too.
 
 **Landmarks are small buildings on a mainland strip** along the bottom: Git is a tree
 whose fruit are commits, PRs a mailbox (its flag pops up on delivery), Jira a post

@@ -8,19 +8,20 @@ import { kindColor, roundRect, ellipse, haloText } from './art.js';
 const C = (hex) => parseColor(hex);
 const NATURE = {
   light: {
-    grass: C('#a1c975'), grassDark: C('#6fa158'), dirt: C('#c08a5c'), dirtDark: C('#86583a'),
+    grass: C('#cdc88f'), grassDark: C('#7a7646'), dirt: C('#c08a5c'), dirtDark: C('#86583a'),
     rock: C('#b3b8bf'), rockDark: C('#7d848e'), wood: C('#d2a26a'), woodDark: C('#8b6440'),
     wall: C('#f4ead8'), ink: C('#4a3020'), gold: C('#f2b51e'),
   },
   dark: {
-    grass: C('#6c9a55'), grassDark: C('#46703a'), dirt: C('#82603f'), dirtDark: C('#4d3626'),
+    grass: C('#55604a'), grassDark: C('#3e4737'), dirt: C('#82603f'), dirtDark: C('#4d3626'),
     rock: C('#727a85'), rockDark: C('#4a5059'), wood: C('#a27a50'), woodDark: C('#6b4d33'),
     wall: C('#cdbfa6'), ink: C('#2b1c12'), gold: C('#f5c542'),
   },
 };
 /**
- * Nature colours for the theme's light/dark mode. The grass is a mossy olive,
- * kept well away from the theme's --green so working critters pop off it.
+ * Nature colours for the theme's light/dark mode. The grass is warm straw-moss
+ * in light and a low sage in dark: clearly not status green, so working
+ * (--green) critters stand off it (see test/scene.test.js).
  */
 export function naturePalette(pal) {
   return NATURE[pal.dark ? 'dark' : 'light'];
@@ -189,6 +190,49 @@ export function drawSignpost(ctx, x, y, text, pal, { scale = 1, alpha = 1, hang 
   let t = text;
   while (t.length > 1 && ctx.measureText(t).width > w - 10) t = t.slice(0, -2) + '…';
   ctx.fillText(t, 0, -29);
+  ctx.restore();
+}
+
+// ── leashes ──────────────────────────────────────────────────────────────────
+
+/**
+ * Rope colours for a parent/child leash: an earthy rope with a contrasting
+ * halo under it, so it reads on grass and on sky in either theme.
+ */
+export function leashStyle(pal) {
+  return pal.dark
+    ? { rope: C('#d9b98c'), halo: C('#1b1410'), twist: C('#a8875c'), width: 2.4, haloWidth: 5 }
+    : { rope: C('#6b4a2e'), halo: C('#fffaf0'), twist: C('#a37a50'), width: 2.4, haloWidth: 5 };
+}
+
+/** The sagging midpoint control for a rope from a to b (a slight catenary). */
+export function leashControl(a, b) {
+  const dist = Math.hypot(b.x - a.x, b.y - a.y);
+  return { x: (a.x + b.x) / 2, y: Math.max(a.y, b.y) + Math.max(10, dist * 0.18) };
+}
+
+/** Draw one leash from a to b; `twist` 0..1 slides the rope's twist marks. */
+export function drawLeash(ctx, a, b, pal, alpha = 1, twist = 0) {
+  if (alpha <= 0.01) return;
+  const st = leashStyle(pal);
+  const c = leashControl(a, b);
+  const path = () => { ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.quadraticCurveTo(c.x, c.y, b.x, b.y); };
+  ctx.save();
+  ctx.lineCap = 'round';
+  path();
+  ctx.strokeStyle = toCss(st.halo, 0.45 * alpha);
+  ctx.lineWidth = st.haloWidth;
+  ctx.stroke();
+  path();
+  ctx.strokeStyle = toCss(st.rope, alpha);
+  ctx.lineWidth = st.width;
+  ctx.stroke();
+  path();
+  ctx.setLineDash([2, 4]);
+  ctx.lineDashOffset = -twist * 6;
+  ctx.strokeStyle = toCss(st.twist, 0.8 * alpha);
+  ctx.lineWidth = st.width * 0.55;
+  ctx.stroke();
   ctx.restore();
 }
 

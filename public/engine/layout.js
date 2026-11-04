@@ -1,6 +1,7 @@
 // Pure layout: where landmarks sit, how tasks are tiled, where each critter lives.
 
 import { hash32, clamp } from './util.js';
+import { relaxSpots, islandAxes, PERSONAL_SPACE, DEPTH_WEIGHT } from './wander.js';
 
 /** Clockwise from top-left. `fx`/`fy` are fractions of the pen size. */
 const LANDMARK_SPOTS = [
@@ -273,7 +274,7 @@ export const isUnassigned = (taskId, taskName) =>
  */
 export function islandSize(k, r) {
   const rx = r * (2.2 + 2.0 * Math.sqrt(Math.max(1, k)));
-  const ry = Math.max(rx * 0.38, r * 1.6);
+  const ry = Math.max(rx * 0.42, r * 1.6);
   return { rx, ry, half: rx + r * 0.6, top: ry + r * 3, bottom: ry * 2.2 + r + 14 };
 }
 
@@ -377,22 +378,85 @@ export function homeSpots(k, seed = 0) {
   return out;
 }
 
+// ── size by role ─────────────────────────────────────────────────────────────
+
+/** Size multipliers: parents are big and easy to click, children small. */
+export const ROLE_SCALE = Object.freeze({ parent: 1.35, child: 0.8, solo: 1 });
+
+/**
+ * Each critter's role from parentId links among the critters present: a
+ * parent has at least one child here (even if it is itself someone's child),
+ * a child has its parent here, everyone else is solo.
+ * @returns {Map<string, { role: 'parent'|'child'|'solo', scale: number, kids: number }>}
+ */
+export function roleScales(critters) {
+  const ids = new Set(critters.map((c) => c.id));
+  const kids = new Map();
+  for (const c of critters) {
+    if (c.parentId && c.parentId !== c.id && ids.has(c.parentId)) kids.set(c.parentId, (kids.get(c.parentId) || 0) + 1);
+  }
+  const out = new Map();
+  for (const c of critters) {
+    const role = kids.has(c.id) ? 'parent' : c.parentId && c.parentId !== c.id && ids.has(c.parentId) ? 'child' : 'solo';
+    out.set(c.id, { role, scale: ROLE_SCALE[role], kids: kids.get(c.id) || 0 });
+  }
+  return out;
+}
+
+/**
+ * Which critter (if any) is under (x, y): the nearest whose body, with a little
+ * slack, contains the point. Bigger critters have bigger targets.
+ * @param {Iterable<{id:string, cx:number, cy:number, cr:number}>} list
+ */
+export function pickAt(list, x, y) {
+  let best = null, bestD = Infinity;
+  for (const s of list) {
+    const d = Math.hypot(x - s.cx, y - s.cy);
+    if (d < s.cr * 1.25 && d < bestD) { best = s; bestD = d; }
+  }
+  return best;
+}
+
+/**
+ * Hand out home spots (centre-first spiral) so parents sit nearest the middle
+ * and each parent's children take the free spots closest to it.
+ */
+function assignSpots(members, spots, roles) {
+  const free = spots.map((p, i) => ({ ...p, i }));
+  const take = (near) => {
+    let bi = 0, bd = Infinity;
+    free.forEach((p, i) => { const d = Math.hypot(p.u - near.u, p.v - near.v); if (d < bd) { bd = d; bi = i; } });
+    return free.splice(bi, 1)[0];
+  };
+  const at = new Map();
+  const parents = members.filter((c) => roles.get(c.id).role === 'parent').sort((a, b) => roles.get(b.id).kids - roles.get(a.id).kids);
+  for (const p of parents) at.set(p.id, take({ u: 0, v: 0 }));
+  for (const p of parents) {
+    for (const c of members) if (c.parentId === p.id && !at.has(c.id)) at.set(c.id, take(at.get(p.id)));
+  }
+  for (const c of members) if (!at.has(c.id)) at.set(c.id, take({ u: 0, v: 0 }));
+  return at;
+}
+
 function computeIslandLayout({ width, height, critters, anchors = new Map() }) {
   const { landmarks, mainland, sky } = sceneFrame(width, height);
   const groups = groupByTask(critters);
+  const roles = roleScales(critters);
+  // Islands are sized by the room their crowd takes: a parent counts for more.
+  const weight = (g) => g.members.reduce((a, c) => a + roles.get(c.id).scale ** 2, 0);
   const base = { compact: false, landmarks, mainland, sky, inner: sky, clusters: [] };
   if (!groups.length) return { ...base, islands: [], spots: new Map(), slots: new Map(), anchors: new Map(), radius: 18, labelWidth: 80 };
 
   const maxR = clamp(Math.min(width, height) / 21, 12, 30), minR = 7;
   let r = maxR, packed, specs;
   for (;;) {
-    specs = groups.map((g) => ({ id: g.taskId, ...islandSize(g.members.length, r) }));
+    specs = groups.map((g) => ({ id: g.taskId, ...islandSize(weight(g), r) }));
     const area = specs.reduce((a, s) => a + 2 * s.half * (s.top + s.bottom), 0);
     if (area <= sky.w * sky.h * 0.8 || r <= minR) {
       packed = packIslands(specs, sky, anchors);
       if (packed.ok || r <= minR) break;
     }
-    r = Math.max(minR, r * 0.9);
+    r = Math.max(minR, r * 0.95);
   }
 
   const islands = [], spots = new Map(), slots = new Map(), nextAnchors = new Map();
@@ -405,12 +469,23 @@ function computeIslandLayout({ width, height, critters, anchors = new Map() }) {
     };
     islands.push(isl);
     nextAnchors.set(g.taskId, { nx: (p.x - sky.x) / sky.w, ny: (p.y - sky.y) / sky.h });
-    const home = homeSpots(g.members.length, isl.seed);
-    familyOrder(g.members).forEach((c, i) => {
-      spots.set(c.id, { taskId: g.taskId, ...home[i] });
-      const pt = islandPoint(isl, home[i].u, home[i].v, r);
-      slots.set(c.id, { x: pt.x, y: pt.y - r, r }); // body centre, like the row layout
+    // Parents in the middle, their children around them; then spread the
+    // resting spots so bodies never touch, even with no wandering to push them
+    // apart (reduced motion, or the very first frame).
+    const ordered = familyOrder(g.members);
+    const at = assignSpots(ordered, homeSpots(ordered.length, isl.seed), roles);
+    const { ax, ay } = islandAxes(isl, r);
+    const relaxed = relaxSpots(ordered.map((c) => {
+      const { role, scale } = roles.get(c.id);
+      return { ...at.get(c.id), rad: r * scale, m: role === 'parent' ? 0.15 : 1 }; // parents hold the middle
+    }), ax, ay * DEPTH_WEIGHT, r * PERSONAL_SPACE);
+    ordered.forEach((c, i) => {
+      const { role, scale } = roles.get(c.id);
+      spots.set(c.id, { taskId: g.taskId, u: relaxed[i].u, v: relaxed[i].v });
+      const cr = r * scale;
+      const pt = islandPoint(isl, relaxed[i].u, relaxed[i].v, cr);
+      slots.set(c.id, { x: pt.x, y: pt.y - cr, r, scale, role }); // body centre, like the row layout
     });
   });
-  return { ...base, islands, spots, slots, anchors: nextAnchors, radius: r, labelWidth: clamp(r * 4.4, 56, 120) };
+  return { ...base, islands, spots, slots, anchors: nextAnchors, radius: r, labelWidth: clamp(r * 6, 110, 150) };
 }
