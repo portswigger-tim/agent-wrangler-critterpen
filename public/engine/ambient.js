@@ -106,3 +106,66 @@ export function drawAmbient(ctx, { W, H, pal, time, reduced, areas }) {
   }
   ctx.restore();
 }
+
+const CLOUDS = 5, STARS = 40;
+
+/**
+ * Where cloud `i` sits at time `t`: drifts slowly right and wraps. Puffs are
+ * offsets in units of the cloud's size.
+ */
+export function cloudAt(i, t, W, horizon) {
+  const r = rng(hash32('cloud:' + i));
+  const size = 18 + r() * 22, speed = 2.5 + r() * 4;
+  const span = W + size * 6;
+  const x = ((r() * span + t * speed) % span) - size * 3;
+  const y = 18 + r() * Math.max(10, horizon * 0.42);
+  const puffs = [[0, 0, 1], [-1.1, 0.25, 0.7], [1.15, 0.2, 0.75], [0.45, -0.45, 0.72], [-0.5, -0.3, 0.6]]
+    .map(([dx, dy, s]) => [dx * (0.85 + r() * 0.3), dy, s * (0.85 + r() * 0.3)]);
+  return { x, y, size, puffs };
+}
+
+/**
+ * Soft sky behind everything: a gentle gradient from the theme's blue down to
+ * the background at the horizon, drifting clouds on light themes and faint
+ * twinkling stars on dark ones. Clouds and stars hold still under reduced motion.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{ W: number, H: number, pal: any, time: number, reduced: boolean, horizon?: number }} o
+ */
+export function drawSky(ctx, { W, H, pal, time, reduced, horizon = H }) {
+  if (W < 40 || H < 40) return;
+  const t = reduced ? 0 : time;
+  const top = pal.dark ? mix(pal.bg, pal.blue, 0.1) : lighten(mix(pal.bg, pal.blue, 0.22), 0.25);
+  const low = pal.dark ? mix(pal.bg, pal.accent, 0.04) : mix(pal.bg, pal.yellow, 0.06);
+  ctx.save();
+  const g = ctx.createLinearGradient(0, 0, 0, horizon);
+  g.addColorStop(0, toCss(top));
+  g.addColorStop(1, toCss(low));
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, horizon);
+  if (pal.dark) {
+    const star = lighten(mix(pal.fg, pal.yellow, 0.2), 0.2);
+    for (let i = 0; i < STARS; i++) {
+      const r = rng(hash32('star:' + i));
+      const x = r() * W, y = r() * horizon * 0.7, ph = r() * TAU, sp = 0.4 + r() * 1.2;
+      const a = 0.15 + 0.35 * (0.5 + 0.5 * Math.sin(t * sp + ph));
+      ctx.fillStyle = toCss(star, a * (1 - y / horizon));
+      ctx.beginPath(); ctx.arc(x, y, 0.6 + r() * 0.7, 0, TAU); ctx.fill();
+    }
+  } else {
+    const body = lighten(pal.bg, 0.75), belly = mix(pal.bg, pal.blue, 0.08);
+    for (let i = 0; i < CLOUDS; i++) {
+      const c = cloudAt(i, t, W, horizon);
+      const cg = ctx.createLinearGradient(0, c.y - c.size, 0, c.y + c.size * 0.6);
+      cg.addColorStop(0, toCss(body, 0.85));
+      cg.addColorStop(1, toCss(belly, 0.75));
+      ctx.fillStyle = cg;
+      ctx.beginPath();
+      for (const [dx, dy, s] of c.puffs) {
+        ctx.moveTo(c.x + dx * c.size + s * c.size, c.y + dy * c.size);
+        ctx.arc(c.x + dx * c.size, c.y + dy * c.size, s * c.size, 0, TAU);
+      }
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}

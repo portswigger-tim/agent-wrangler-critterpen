@@ -137,6 +137,13 @@ export function drawCritter(ctx, p, pal, t) {
 
 /** Body sphere: soft radial shading, under-shade, rim light, gentle outline, gloss. */
 function drawBody(ctx, r, color, line, lw, pal) {
+  // Faint pale "sticker" rim outside the outline: lifts the body off busy
+  // ground (a green critter on grass still reads).
+  ellipse(ctx, 0, -r, r + lw * 0.9, r + lw * 0.9);
+  ctx.lineWidth = lw * 1.1;
+  ctx.strokeStyle = toCss(lighten(color, 0.8), pal.dark ? 0.32 : 0.6);
+  ctx.stroke();
+
   const grad = ctx.createRadialGradient(-r * 0.35, -r * 1.45, r * 0.05, 0, -r * 0.95, r * 1.15);
   grad.addColorStop(0, toCss(lighten(color, 0.5)));
   grad.addColorStop(0.32, toCss(lighten(color, 0.14)));

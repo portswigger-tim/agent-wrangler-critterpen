@@ -14,7 +14,7 @@ import {
 } from './art.js';
 // ── personality hooks ── (behaviour.js / ambient.js / art.js are the character artist's)
 import { createMind, applyBehaviour } from './behaviour.js';
-import { drawAmbient } from './ambient.js';
+import { drawAmbient, drawSky } from './ambient.js';
 
 /** @typedef {import('./contract.js').PenState} PenState */
 /** @typedef {import('./contract.js').PenEvent} PenEvent */
@@ -792,6 +792,8 @@ export function createPen(el, opts = {}) {
     ctx.clearRect(0, 0, W, H);
     if (!layout) return;
     const dt = 1 / 60;
+    // ── personality hooks ── soft sky (gradient, clouds or stars) behind the scene.
+    if (!layout.compact) drawSky(ctx, { W, H, pal, time, reduced, horizon: layout.mainland ? layout.mainland.y + 30 : H });
 
     // ── islands / wander ── mainland, then islands back to front with signposts.
     if (layout.mainland) {
