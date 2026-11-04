@@ -2,7 +2,7 @@
 // Canvas 2D, one requestAnimationFrame loop, no dependencies, no wrangler knowledge.
 
 import { LANDMARK_KINDS, STATUSES, isPenEvent } from './contract.js';
-import { hash32, rng, clamp, lerp, ease, springStep, truncateToWidth, quad, quadAngle, arcControl, TAU } from './util.js';
+import { critterTraits, rng, clamp, lerp, ease, springStep, truncateToWidth, quad, quadAngle, arcControl, TAU } from './util.js';
 import { readTheme, toCss, mix, lighten, darken, ensureContrast } from './color.js';
 import { computeLayout, LANDMARK_LABELS } from './layout.js';
 import { diffCritters } from './diff.js';
@@ -71,14 +71,16 @@ export function createPen(el, opts = {}) {
   // ── sprites ────────────────────────────────────────────────────────────────
 
   function makeSprite(c, delay = 0) {
-    const seed = hash32(c.id);
-    const rand = rng(seed);
+    const tr = critterTraits(c.id, ACCESSORIES.length);
+    const seed = tr.seed;
+    // Runtime randomness (blinks, smoke) gets its own stream, apart from the looks.
+    const rand = rng(seed ^ 0x9e3779b9);
     return {
-      id: c.id, data: c, seed, rand,
-      accessory: ACCESSORIES[seed % ACCESSORIES.length],
-      ...inks(c.agent, seed),
-      phase: rand() * 10,
-      sizeJitter: 0.92 + rand() * 0.16,
+      id: c.id, data: c, seed, rand, hue: tr.hue, hop: tr.hop,
+      accessory: ACCESSORIES[tr.accessory],
+      ...inks(c.agent, tr.hue),
+      phase: tr.phase,
+      sizeJitter: tr.size,
       x: { x: 0, v: 0 }, y: { x: 0, v: 0 }, r: { x: 0, v: 0 },
       homeX: 0, homeY: 0, homeR: 16, placed: false,
       status: c.status, prevStatus: c.status, statusAge: 9,
@@ -94,8 +96,8 @@ export function createPen(el, opts = {}) {
     };
   }
 
-  function inks(agent, seed) {
-    const tint = agentTint(agent, seed);
+  function inks(agent, hue) {
+    const tint = agentTint(agent, hue);
     return { tint, eyeInk: mix({ r: 29, g: 32, b: 38, a: 1 }, darken(tint, 0.5), 0.35) };
   }
 
@@ -130,7 +132,7 @@ export function createPen(el, opts = {}) {
     });
     for (const c of d.updated) {
       const s = sprites.get(c.id);
-      if (s) Object.assign(s, { data: c }, inks(c.agent, s.seed));
+      if (s) Object.assign(s, { data: c }, inks(c.agent, s.hue));
     }
     for (const { id, from, to } of d.statusChanged) {
       const s = sprites.get(id);
@@ -424,7 +426,7 @@ export function createPen(el, opts = {}) {
       // Status-driven particles.
       const r = s.r.x;
       if (s.status === 'working') {
-        const P = 0.62 + (s.seed % 7) * 0.02;
+        const P = 0.62 + s.hop * 0.02;
         const p = ((time + s.phase) / P) % 1;
         if (s.hopP < 0.75 && p >= 0.75) puff(s.cx, s.homeY, 'dust');
         s.hopP = p;
@@ -490,7 +492,7 @@ export function createPen(el, opts = {}) {
     }
     switch (status) {
       case 'working': {
-        const P = 0.62 + (s.seed % 7) * 0.02;
+        const P = 0.62 + s.hop * 0.02;
         const p = (t / P) % 1;
         const drift = Math.sin(t * 0.9) * r * 0.25;
         if (p < 0.75) {

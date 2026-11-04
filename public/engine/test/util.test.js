@@ -57,3 +57,58 @@ test('quad hits endpoints and arcControl lifts above both ends', () => {
   assert.ok(arcControl({ x: 0, y: 10 }, { x: 10, y: 10 }, 4).y >= 4, 'clamped inside canvas');
   assert.equal(clamp(5, 0, 3), 3);
 });
+
+// ── hat / tint spread over realistic session ids ─────────────────────────────
+import { critterTraits } from '../util.js';
+
+const HATS = 10;
+// Deterministic UUID-shaped ids so the test never flakes.
+const hex = (r, n) => Array.from({ length: n }, () => Math.floor(r() * 16).toString(16)).join('');
+const uuid = (r) => `${hex(r, 8)}-${hex(r, 4)}-4${hex(r, 3)}-8${hex(r, 3)}-${hex(r, 12)}`;
+const FAMILIES = {
+  'random uuids': (() => { const r = rng(7); return () => uuid(r); })(),
+  'shared prefix': (() => { let i = 0; return () => `6abf2ad4-fc55-4f49-8bbf-${(i++).toString(16).padStart(12, '0')}`; })(),
+  'shared suffix': (() => { let i = 0; return () => `${(i++).toString(16).padStart(8, '0')}-fc55-4f49-8bbf-ad039ef2ea13`; })(),
+  'sequential short ids': (() => { let i = 0; return () => `s-${i++}`; })(),
+};
+// Chi-square critical values at p = 0.001.
+const CHI2_DF9 = 27.88, CHI2_DF81 = 124.84;
+const chi2 = (counts, expected) => counts.reduce((s, c) => s + (c - expected) ** 2 / expected, 0);
+
+for (const [name, next] of Object.entries(FAMILIES)) {
+  test(`accessories spread evenly across ${name}`, () => {
+    const n = 5000, buckets = Array(HATS).fill(0);
+    for (let i = 0; i < n; i++) buckets[critterTraits(next(), HATS).accessory]++;
+    const x = chi2(buckets, n / HATS);
+    assert.ok(x < CHI2_DF9, `chi2=${x.toFixed(1)} buckets=${buckets.join(',')}`);
+  });
+}
+
+test('sharing a hat says nothing about the tint hue', () => {
+  const r = rng(11), n = 10000, table = Array.from({ length: HATS }, () => Array(HATS).fill(0));
+  for (let i = 0; i < n; i++) {
+    const t = critterTraits(uuid(r), HATS);
+    table[t.accessory][Math.floor(t.hue / 36)]++;
+  }
+  // Independence: every (hat, hue band) cell should hold about n / 100.
+  const x = chi2(table.flat(), n / (HATS * HATS));
+  assert.ok(x < CHI2_DF81, `chi2=${x.toFixed(1)}`);
+});
+
+test('hash32 collisions stay near the birthday bound', () => {
+  const r = rng(3), seen = new Set();
+  let coll = 0;
+  for (let i = 0; i < 50000; i++) {
+    const h = hash32(uuid(r));
+    if (seen.has(h)) coll++;
+    seen.add(h);
+  }
+  assert.ok(coll <= 3, `${coll} collisions (expected ~0.3)`);
+});
+
+test('critterTraits is stable and in range', () => {
+  const a = critterTraits('6abf2ad4-fc55-4f49-8bbf-ad039ef2ea13', HATS);
+  assert.deepEqual(a, critterTraits('6abf2ad4-fc55-4f49-8bbf-ad039ef2ea13', HATS));
+  assert.ok(a.accessory >= 0 && a.accessory < HATS && a.hue >= 0 && a.hue < 360 && a.hop >= 0 && a.hop < 7);
+  assert.ok(a.size >= 0.92 && a.size <= 1.08);
+});
