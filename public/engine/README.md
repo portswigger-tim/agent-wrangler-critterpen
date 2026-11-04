@@ -46,6 +46,7 @@ cd public/engine && npm test   # node --test, no dependencies
 | `art.js` | Vector drawing: critters (eyes, lids, mouths), accessories, bubbles, projectiles |
 | `behaviour.js` | Personality: rare, seeded, deterministic idle behaviours and pose modifiers |
 | `ambient.js` | Sky, fireflies (dark) and petals/motes (light); stateless |
+| `buildings.js` | Service buildings (bigger, with hit animations and plank captions), kept apart from their carrier (floating islets) |
 | `scene.js` | Scenery: floating islands, name planks, the mainland and its buildings |
 | `layout.js` | Pure layout: island sizing and packing, size by role, home spots, hit testing, landmark positions, compact tray rows |
 | `wander.js` | Pure movement: wandering an island, personal space, the bell queue |
@@ -53,6 +54,8 @@ cd public/engine && npm test   # node --test, no dependencies
 | `diff.js` | Pure snapshot diff |
 | `color.js` | Colour parsing/mixing, HSL, pastel status colours, theme token reading |
 | `util.js` | Hashing, seeded RNG, easing, springs, text truncation |
+
+`buildings.html` does the same for the service buildings (`?hit=0.6`, `?t=2`).
 
 `sheet.html` is a character sheet: every status face and personality behaviour
 drawn large (`?theme=light`, `?t=3` to freeze time, `?r=60` for size). Use it
