@@ -5,7 +5,7 @@
   "description": "Framework-free Canvas 2D renderer for Critter Pen. No dependencies.",
   "main": "pen.js",
   "scripts": {
-    "test": "node --test test/",
+    "test": "node --test test/*.test.js",
     "demo": "python3 -m http.server 8080"
   }
 }

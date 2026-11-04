@@ -731,9 +731,17 @@ export function createPen(el, opts = {}) {
           ctx.fillStyle = toCss(mix(pal['surface-2'], pal.fg, 0.2), 0.5 * (1 - k));
           ellipse(ctx, p.x, p.y, p.size * (1 + k), p.size * (1 + k) * 0.8); ctx.fill(); break;
         case 'smoke': {
-          const c = pal.dark ? mix(pal['surface-2'], pal.fg, 0.55) : mix(pal['surface-2'], pal.fg, 0.25);
-          ctx.fillStyle = toCss(c, (pal.dark ? 0.4 : 0.55) * (1 - k));
-          ellipse(ctx, p.x, p.y, p.size * (1 + k * 1.8), p.size * (1 + k * 1.8)); ctx.fill(); break;
+          // A little three-lobed cloud that swells and fades as it rises.
+          const c = pal.dark ? mix(pal['surface-2'], pal.fg, 0.7) : mix(pal['surface-2'], pal.fg, 0.25);
+          const sz = p.size * (1 + k * 1.6);
+          ctx.fillStyle = toCss(c, (pal.dark ? 0.35 : 0.5) * (1 - k));
+          ctx.beginPath();
+          ctx.arc(p.x - sz * 0.6, p.y + sz * 0.2, sz * 0.7, 0, TAU);
+          ctx.moveTo(p.x + sz * 1.3, p.y + sz * 0.2);
+          ctx.arc(p.x + sz * 0.6, p.y + sz * 0.2, sz * 0.7, 0, TAU);
+          ctx.moveTo(p.x + sz, p.y - sz * 0.15);
+          ctx.arc(p.x, p.y - sz * 0.15, sz, 0, TAU);
+          ctx.fill(); break;
         }
         case 'z':
           haloText(ctx, 'z', p.x + Math.sin(p.age * 2 + p.phase) * 4, p.y, pal, (1 - k) * 0.8,
