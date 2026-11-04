@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Critter sheet</title>
+<style>
+  :root, :root[data-theme="dark"] {
+    --bg: #12151b; --surface-2: #3a414b; --fg: #e6edf3;
+    --green: #56d364; --blue: #6ca7ff; --yellow: #f5c542; --red: #ff6b6b; --accent: #bc8cff;
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f1ea; --surface-2: #cfd3da; --fg: #23262d;
+    --green: #2fa84f; --blue: #3b7ddd; --yellow: #e9a514; --red: #e5484d; --accent: #8e5bd8;
+  }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 13px system-ui, sans-serif; }
+  #sheet { width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<!-- Art reference: every status face and personality behaviour, drawn large.
+     ?theme=light  ?t=seconds (freeze time)  ?r=radius -->
+<canvas id="sheet"></canvas>
+<script type="module">
+import { drawCritter, drawShadow, drawChatBubble, agentTint, haloText } from './art.js';
+import { readTheme, statusColor } from './color.js';
+import { applyBehaviour, BEHAVIOURS } from './behaviour.js';
+import { drawAmbient } from './ambient.js';
+
+const q = new URLSearchParams(location.search);
+if (q.get('theme')) document.documentElement.dataset.theme = q.get('theme');
+const canvas = document.getElementById('sheet');
+const ctx = canvas.getContext('2d');
+const R = +(q.get('r') || 46);
+const frozen = q.has('t') ? +q.get('t') : null;
+
+const STATUS = [
+  ['working', { eyes: 'open', mouth: 'cat', lidTop: 0.1, lidBot: 0.24, lidTilt: 0.03, accessory: 'sprout' }],
+  ['thinking', { eyes: 'open', mouth: 'hmm', lidTop: 0, lidBot: 0.08, lookX: 0.45, lookY: -0.9, accessory: 'none' }],
+  ['needs-you', { eyes: 'wide', mouth: 'o', wave: -0.6, glow: 0.5, accessory: 'party' }],
+  ['error', { eyes: 'spiral', mouth: 'wavy', accessory: 'propeller' }],
+  ['idle', { eyes: 'open', mouth: 'smile', lidTop: 0, lidBot: 0.2, accessory: 'headphones' }],
+  ['finished', { eyes: 'open', mouth: 'smile', lidTop: 0.08, sx: 1.06, sy: 0.93, feetDrop: -0.15, lookY: 0.15, accessory: 'beanie' }],
+  ['asleep', { eyes: 'open', mouth: 'small-o', lidTop: 1, lidBot: 0.1, accessory: 'bow' }],
+];
+const KINDS = Object.keys(BEHAVIOURS);
+const AT = { yawn: 0.45, stretch: 0.5, lookAround: 0.2, chat: 0.45, glance: 0.45, hum: 0.4, wave: 0.4, wiggle: 0.3 };
+
+function frame(ms) {
+  const t = frozen ?? ms / 1000;
+  const dpr = devicePixelRatio || 1;
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+  if (canvas.width !== W * dpr) { canvas.width = W * dpr; canvas.height = H * dpr; }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  const pal = readTheme(document.documentElement, 'auto');
+  drawAmbient(ctx, { W, H, pal, time: t, reduced: false });
+  const tint = agentTint('claude', 0);
+  const base = { sx: 1, sy: 1, rot: 0, dx: 0, dy: 0, lookX: 0, lookY: 0, blink: 1, eyeInk: { r: 33, g: 30, b: 38, a: 1 }, tint };
+  const draw = (x, y, status, pose, label) => {
+    const color = statusColor(status, pal);
+    drawShadow(ctx, x, y, R, 0, pal);
+    drawCritter(ctx, { ...base, ...pose, x: x + (pose.dx || 0), y: y + (pose.dy || 0), r: R, color, phase: 1 }, pal, t);
+    if (pose.bubble) drawChatBubble(ctx, x, y - R * 2.2, pose.bubble, pal, R);
+    haloText(ctx, label, x, y + 18, pal, 0.8);
+  };
+  const gap = Math.min(220, (W - 40) / STATUS.length);
+  STATUS.forEach(([st, pose], i) => draw(30 + gap * (i + 0.5), 40 + R * 2.6, st, pose, st));
+  const gap2 = Math.min(200, (W - 40) / KINDS.length);
+  KINDS.forEach((kind, i) => {
+    const dur = BEHAVIOURS[kind].dur, age = AT[kind] * dur;
+    const b = { kind, age, dur, k: age / dur, pick: 0.2, target: 'x' };
+    const status = kind === 'chat' || kind === 'lookAround' ? 'working' : 'idle';
+    const start = status === 'idle' ? { eyes: 'open', mouth: 'smile', lidTop: 0, lidBot: 0.2 } : { eyes: 'open', mouth: 'cat', lidTop: 0.1, lidBot: 0.24 };
+    const pose = applyBehaviour({ ...base, ...start }, b, R, { x: i % 2 ? -1 : 1, y: 0 });
+    draw(30 + gap2 * (i + 0.5), 80 + R * 6, status, pose, kind);
+  });
+  if (frozen == null) requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
