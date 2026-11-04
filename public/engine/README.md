@@ -46,9 +46,10 @@ cd public/engine && npm test   # node --test, no dependencies
 | `art.js` | Vector drawing: critters (eyes, lids, mouths), accessories, bubbles, projectiles |
 | `behaviour.js` | Personality: rare, seeded, deterministic idle behaviours and pose modifiers |
 | `ambient.js` | Sky, fireflies (dark) and petals/motes (light); stateless |
-| `scene.js` | Islands, signposts, mainland and building landmarks |
-| `layout.js` | Pure layout: islands, mainland, critter placement |
-| `wander.js` | Island wandering and bell queueing |
+| `scene.js` | Scenery: floating islands, name planks, the mainland and its buildings |
+| `layout.js` | Pure layout: island sizing and packing, home spots, landmark positions, compact tray rows |
+| `wander.js` | Pure movement: wandering an island, personal space, the bell queue |
+| `labels.js` | Pure name-label placement so labels never overlap |
 | `diff.js` | Pure snapshot diff |
 | `color.js` | Colour parsing/mixing, HSL, pastel status colours, theme token reading |
 | `util.js` | Hashing, seeded RNG, easing, springs, text truncation |

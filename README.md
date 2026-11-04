@@ -28,6 +28,11 @@ the Jira post office.
   at a newly spawned critter, and a finished critter does a happy wiggle. Each
   critter's quirks are seeded from its session id, so they never fall into step.
 - **Leashes:** a dotted leash joins a session to the sessions it spawned.
+- **Names:** each critter's name sits under it. When critters crowd together, the
+  names never overlap: the critters that need you keep theirs in place, others shift
+  aside or above their heads, and a name with no room left fades to a whisper. Critters
+  waiting at the bell show their name above their heads. Hover a critter for its full
+  name.
 - **Click:** clicking a critter opens its session on the board.
 - **Reduced motion:** the pen follows your OS reduced-motion setting live, swapping
   motion for colour and opacity changes. Personality and ambient fireflies or petals
