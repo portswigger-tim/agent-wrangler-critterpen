@@ -17,7 +17,8 @@ const RETICK_MS = 3000;
 const ACTIVITY_KINDS = new Set(['git', 'pr', 'jira', 'terminal', 'files', 'web']);
 const MAX_LABEL = 40;
 
-const ICON = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="13" r="8"/><circle cx="9.5" cy="12" r="1" fill="currentColor"/><circle cx="14.5" cy="12" r="1" fill="currentColor"/><path d="M8 4.5 10 6M16 4.5 14 6"/></svg>';
+// `class="icon"` is what sizes it on the rail (core's `#nav-rail .icon`); without it the button draws it smaller.
+export const ICON = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><circle cx="9.5" cy="12" r="1" fill="currentColor"/><circle cx="14.5" cy="12" r="1" fill="currentColor"/><path d="M8 4.5 10 6M16 4.5 14 6"/></svg>';
 
 let enginePromise = null;
 function loadEngine() {
