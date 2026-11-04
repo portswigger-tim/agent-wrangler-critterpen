@@ -13,11 +13,11 @@ the Jira post office.
 
 | Critter | Session |
 | --- | --- |
-| Green, hopping | Working: running tools, or a background job (the board's **JOB**) |
-| Blue, bobbing with "…" | Thinking: working but quiet for a while, or waiting on sessions it spawned |
+| Green, hopping | Working: running tools, a background job (the board's **JOB**), or a running sub-agent or agent-team member |
+| Blue, bobbing with "…" | Thinking: working but quiet for a while, or idle while a session it spawned or nests is still working |
 | Amber, "!", at the bell | Needs you: a permission prompt, a question or an API error |
 | Red, dizzy, smoking | One of its own PRs has failing checks |
-| Lilac, sitting, with a ✓ | Finished a turn you haven't looked at yet |
+| Lilac, sitting, with a ✓ | Finished a turn you haven't looked at yet. Clicking the critter or opening the session on the board clears it. Remembered per browser, and it never dozes off |
 | Grey, awake and relaxed | Idle at its prompt |
 | Grey, dozing, "z z z" | No live terminal (the board's **RESUME**), snoozed, or quiet for 30+ min |
 | Waves and walks off | Archived |

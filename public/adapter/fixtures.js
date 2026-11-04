@@ -19,6 +19,10 @@ export function session(sessionId, over = {}) {
     offBoard: null,
     links: [],
     lastActivity: NOW,
+    managed: true,
+    snooze: null,
+    subAgents: [],
+    teammates: [],
     ...over,
   };
 }

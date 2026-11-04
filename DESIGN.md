@@ -134,13 +134,17 @@ reason). A `view`'s `update(el, session, graph)` gets the board's wire graph:
 | `taskId`, `taskName` | `graph.tasks.assignments[sessionId]` → `graph.tasks.tasks[].name`; none = `adhoc` / "Unassigned" |
 | `parentId` | `.parentSession` (board nesting), else `.spawnedBy` (launch lineage) |
 | `needs-you` | `.status === 'needs-you'` (permission prompts, questions, API errors; reason in `.waitingFor`) |
-| `working` | `.status === 'working'` with transcript activity in the last 20 s, or `.rawStatus === 'shell'` (a Bash tool running), or `idle` with `.hasBackgroundShell` (the board's green JOB) |
-| `thinking` | `.status === 'working'` and `.lastActivity` older than 20 s |
-| `error` | not working/needs-you, and one of its own PR links has `checkStatus: 'failing'` |
-| `idle` | everything else, including dormant cards; `unknown` reads idle only after 10 s (earlier it holds the previous look) |
+| `working` | `.status === 'working'` with transcript activity in the last 20 s, or `.rawStatus === 'shell'` (a Bash tool running); or idle but still busy on its own: `.hasBackgroundShell` (the board's green JOB), a `subAgents[]` entry with `status: 'running'`, or a `teammates[]` entry that is `working` |
+| `thinking` | `.status === 'working'` and `.lastActivity` older than 20 s; or "busy elsewhere": idle, but a child on the pen (its `parentSession`/`spawnedBy` points here) is working or thinking (one level) |
+| `error` | not working/needs-you, and one of its own PR links has `checkStatus: 'failing'` (shown even on an asleep or finished card) |
+| `asleep` | no live pane (`.dormant`, or `.managed === false`: the board offers Resume), snoozed (`.snooze.until` in the future), or live but quiet for 30 min (wakes on fresh activity, under 25 min, so `lastActivity` jitter cannot flicker it) |
+| `finished` | live and idle after a working → idle turn the human has not looked at: cleared by clicking the critter, selecting the card on the board, the session leaving idle, or leaving the board. Kept per browser in the extension's own storage; never dozes off |
+| `idle` | awake and relaxed: live, at its prompt, nothing pending. `unknown` reads idle only after 10 s (earlier it holds the previous look) |
 | `archived` | the card left `graph.sessions`; it stays 8 s as `archived` for the walk-off |
 
-Precedence: needs-you > working > thinking > error > idle.
+Precedence: needs-you > working > thinking > error > asleep > finished > idle.
+An engine whose contract does not list `asleep`/`finished` yet gets `idle` for both
+(`forEngine` in `public/adapter/state.js`).
 
 Graph-derived events (`public/adapter/events.js`, never on the first tick): new PR link
 → `pr` (`#123`), new Jira link → `jira` (key), PR checks turning failing → `error`, a
