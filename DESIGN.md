@@ -50,8 +50,7 @@ Two independent pieces with one contract between them.
  │  graph ticks ──► adapter/ (graph → PenState + PenEvent[]) ──┐  │
  │                                                             ▼  │
  │                     engine/ (pure renderer, no wrangler deps)  │
- │                     mounted into `view` slot (full pen) and    │
- │                     optionally `board.tray` (mini strip)       │
+ │                     mounted into the `view` slot (Critters)    │
  └────────────────────────────────────────────────────────────────┘
 ```
 
@@ -59,8 +58,8 @@ Two independent pieces with one contract between them.
   Knows nothing about Agent Wrangler. Ships a standalone `demo.html` driven by a fake
   event generator so it can be developed and shown off in any browser.
 - **Extension (`index.js`, `package.json`, `public/`)** — the wrangler manifest and
-  client entry. Registers a `view` contribution ("Critters" rail button) and later a
-  `board.tray` mini-pen. Adapter diffs successive board graphs into the contract below.
+  client entry. Registers a `view` contribution ("Critters" rail button). Adapter diffs
+  successive board graphs into the contract below.
 
 ### Contract: `public/engine/contract.js`
 
@@ -132,4 +131,4 @@ It comes from the extension's own transcript sweep (`server/sweep.js`), describe
 1. Engine demo page with critters in every state + all projectile kinds (fake data).
 2. Extension installs locally, `view` shows real sessions with correct status.
 3. Real activity events from links / PR status / tool use.
-4. `board.tray` mini-pen, reduced-motion polish, theme check across all themes.
+4. Reduced-motion polish, theme check across all themes.

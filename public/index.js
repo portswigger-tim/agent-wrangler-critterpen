@@ -28,7 +28,16 @@ function loadEngine() {
   return enginePromise;
 }
 
-const reducedMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+// The options every renderer gets. `reducedMotion` is deliberately absent: left
+// undefined, the engine follows prefers-reduced-motion live, where a boolean
+// captured at mount would pin it to whatever it was then. A click on a critter
+// opens its session on the board, the same as a #session= link.
+export function penOptions(api) {
+  return {
+    theme: 'auto',
+    onCritterClick: (id) => { api?.openSession?.(id); },
+  };
+}
 
 function needsYouCount(graph) {
   return (graph?.sessions || []).filter((s) => s && !s.offBoard && s.status === 'needs-you').length;
@@ -67,9 +76,10 @@ export default {
       label: 'Critters',
       icon: ICON,
       badge: needsYouCount,
-      mount(el) {
+      mount(el, api) {
         el.classList.add('critter-pen');
-        const st = { pen: createPlaceholderPen(el, { theme: 'auto', reducedMotion: reducedMotion() }), adapter: createAdapter(), graph: null, critters: new Set(), timer: null, observer: null };
+        const opts = penOptions(api);
+        const st = { pen: createPlaceholderPen(el, opts), adapter: createAdapter(), graph: null, critters: new Set(), timer: null, observer: null };
         pens.set(el, st);
         st.timer = setInterval(() => render(st), RETICK_MS);
         if (typeof ResizeObserver === 'function') {
@@ -79,7 +89,7 @@ export default {
         loadEngine().then((createPen) => {
           if (!createPen || pens.get(el) !== st) return;
           st.pen.destroy();
-          st.pen = createPen(el, { theme: 'auto', reducedMotion: reducedMotion() });
+          st.pen = createPen(el, opts);
           // A fresh renderer has seen nothing: give it the current state, without
           // replaying events it would draw as new.
           st.adapter.reset();
