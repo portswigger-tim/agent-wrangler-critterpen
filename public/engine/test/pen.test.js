@@ -141,3 +141,21 @@ test('reduced motion: no personality behaviours or ambient particles, even over 
   }
   pen.destroy();
 });
+
+test('keeper catch state: anticipation before landing, the chomp at landing, full after a burst', async () => {
+  const { catchStateAt } = await import('../pen.js');
+  const { CATCH, LAND, FULL_AT } = await import('../buildings.js');
+  const land = 10;
+  const before = catchStateAt([land], land - 0.2);
+  assert.ok(before.progress > 0 && before.progress < LAND, 'winding up before it lands');
+  assert.equal(before.recent, 0, 'nothing has landed yet');
+  assert.ok(Math.abs(catchStateAt([land], land).progress - LAND) < 1e-9, 'chomp exactly at landing');
+  assert.equal(catchStateAt([land], land - CATCH.lead - 0.01).progress, null, 'idle before the window');
+  assert.equal(catchStateAt([land], land - CATCH.lead + CATCH.dur + 0.01).progress, null, 'idle after it');
+  // Several overlapping catches: the newest drives the pose; a quick burst makes it full.
+  const burst = [land, land + 0.2, land + 0.4];
+  const s = catchStateAt(burst, land + 0.45);
+  assert.equal(s.progress, catchStateAt([land + 0.4], land + 0.45).progress);
+  assert.ok(s.recent >= FULL_AT, 'full after a burst');
+  assert.ok(catchStateAt(burst, land + 2.5).recent < FULL_AT, 'digested a moment later');
+});

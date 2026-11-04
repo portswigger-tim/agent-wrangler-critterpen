@@ -100,7 +100,17 @@ box (`buildings.bellQueueSlots`); the one at the front (`PHONE_HOLDER_SLOT`) sta
 holding the receiver on its curly cord, and the phone rings while anyone waits (no
 count: another extension shows that). Projectiles arc from the critter to the service's
 building: git = little commit dots, PR = paper plane, Jira = ticket card, terminal =
-sparks, files = paper scraps, web = tiny balloon; the building plays its hit animation.
+sparks, files = paper scraps, web = tiny balloon. Each service islet except the phone
+box has a **keeper** (`buildings.js`/`keepers.js`, the artist's) standing in front of its
+building: projectiles aim at the keeper's mouth (`keeperMouth`, riding the islet's
+bob) and every launch records its landing time, so the keeper winds up just before
+impact, chomps on landing and goes "full" after three catches within a second
+(`catchProgress`/`recentCatches`, combined by `pen.catchStateAt`). The building still
+plays its hit animation. Keepers never move and never affect layout; they are
+blocked areas for name labels and show their name on hover, with no click. Under
+reduced motion a projectile fades out at the keeper's mouth instead of flying. Event
+labels float up from above the building (or drop from under its caption plank when
+it's at the top of the pen), clear of the keeper.
 
 Below 170px tall (the `board.tray` strip) the pen falls back to a single row of task
 clusters with the buildings shrunk into a strip on the right.

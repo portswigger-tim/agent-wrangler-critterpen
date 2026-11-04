@@ -7,6 +7,7 @@ import { readTheme, toCss, mix, lighten, darken, statusColor } from './color.js'
 import { computeLayout, islandPoint, pickAt, LANDMARK_LABELS } from './layout.js';
 import { createWander, stepWander, wanderPace, separate, islandAxes, PERSONAL_SPACE, DEPTH_WEIGHT } from './wander.js';
 import { drawIsland, drawSignpost, drawBuilding, drawLeash } from './scene.js';
+import { drawKeeper, keeperMouth, keeperHitbox, catchProgress, recentCatches, KEEPER_NAMES } from './buildings.js';
 import { drawCarrier, drawServiceBuilding, drawCaptionPlank, isletFootprint, isletBob, bellQueueSlots, buildingFootprint,
   PHONE_HOLDER_SLOT, phoneSocket, receiverSpot, drawPhoneReceiver } from './buildings.js';
 import { placeLabels, stripTaskPrefix, shortLabel } from './labels.js';
@@ -31,6 +32,20 @@ const FONT_FLOAT = '700 11px system-ui, -apple-system, Segoe UI, sans-serif';
 
 /** Body colour for a status in the current palette (pastel-tuned; lives in color.js). */
 export { statusColor };
+
+/**
+ * A keeper's catch state from the landing times of projectiles aimed at it
+ * (past and still in flight): the newest catch in progress, and how many
+ * landed in the last moment (enough of them and it looks full).
+ */
+export function catchStateAt(lands, now) {
+  let progress = null, latest = -Infinity;
+  for (const at of lands) {
+    const p = catchProgress(now, at);
+    if (p != null && at > latest) { latest = at; progress = p; }
+  }
+  return { progress, recent: recentCatches(lands, now) };
+}
 
 /**
  * Mount a pen into `el` (which must have a size; the canvas fills it).
@@ -65,6 +80,8 @@ export function createPen(el, opts = {}) {
   // ── islands / wander ──
   const islandViz = new Map(); // taskId → eased island geometry + bob
   const bellQueue = []; // ids of critters waiting at the bell, in arrival order
+  const keeperLands = new Map(); // kind → landing times (past and in flight) of projectiles at its keeper
+  let hoveredKeeper = null;
   const projectiles = [], particles = [], floaters = [];
   const lmState = new Map(LANDMARK_KINDS.map((k) => [k, { pulseAge: 9, ringAge: 9, glowAge: 9, wiggleAge: 9 }]));
   const pendingBaby = new Map(); // parentId → { x, y, at }
@@ -244,6 +261,14 @@ export function createPen(el, opts = {}) {
         s.visit = { lm, age: 0, stage: 'go', label: ev.label };
         return;
       }
+      const mouth = keeperTarget(ev.kind);
+      if (from && reduced && mouth) {
+        // Reduced motion: no flight; the projectile fades into the keeper's mouth.
+        projectiles.push({ kind: ev.kind, fadeAt: mouth, p0: mouth, p1: mouth, p2: mouth, age: 0, delay: 0, dur: 0.45, last: true, label: ev.label, lm });
+        noteLanding(ev.kind, time + 0.45);
+        flash(s, kindColor(ev.kind, pal));
+        return;
+      }
       if (!from || reduced) {
         hitLandmark(lm, ev.label);
         if (alive) flash(s, kindColor(ev.kind, pal));
@@ -292,7 +317,8 @@ export function createPen(el, opts = {}) {
     s.throwAge = 0;
     s.lookAt = { x: lm.x, y: lm.y };
     s.lookUntil = time + 1.2;
-    const to = { x: lm.x, y: lm.y };
+    // Aim for the service keeper's mouth (it catches and eats them), else the building.
+    const to = keeperTarget(kind) || { x: lm.x, y: lm.y };
     const dist = Math.hypot(to.x - from.x, to.y - from.y);
     const base = clamp(dist / 520, 0.55, 1.15);
     const count = kind === 'git' ? 3 : kind === 'files' ? 4 : 1;
@@ -301,13 +327,42 @@ export function createPen(el, opts = {}) {
       const ctl = arcControl(from, to, 6);
       ctl.x += jitter;
       if (kind === 'web') ctl.y = Math.max(6, ctl.y - 40);
-      projectiles.push({
+      const p = {
         kind, p0: { ...from }, p1: ctl, p2: to, age: 0,
         delay: 0.08 + i * (kind === 'git' ? 0.11 : 0.06),
         dur: kind === 'web' ? base * 1.7 : base + i * 0.03,
         last: i === count - 1, label, lm, sway: kind === 'web' ? 10 : 0,
-      });
+      };
+      projectiles.push(p);
+      noteLanding(kind, time + p.delay + p.dur); // the keeper starts its catch just before
     }
+  }
+
+  /** Where a service keeper's mouth is now (riding its islet), or null if it has none. */
+  function keeperTarget(kind) {
+    const isl = layout?.islets?.find((i) => i.kind === kind);
+    const m = isl && keeperMouth(kind, isl.scale);
+    if (!m) return null;
+    const base = isletBase(isl);
+    return { x: base.x + m.dx, y: base.y + m.dy };
+  }
+
+  function noteLanding(kind, at) {
+    if (!keeperLands.has(kind)) keeperLands.set(kind, []);
+    const list = keeperLands.get(kind);
+    list.push(at);
+    while (list.length && list[0] < time - 3) list.shift(); // only the last few seconds matter
+  }
+
+  /** The service keeper (not the phone box's) under (x, y), for its hover tooltip. */
+  function pickKeeper(x, y) {
+    for (const isl of layout?.islets || []) {
+      const hb = keeperHitbox(isl.kind, isl.scale);
+      if (!hb) continue;
+      const base = isletBase(isl);
+      if (Math.hypot(x - (base.x + hb.dx), y - (base.y + hb.dy)) <= hb.r) return isl;
+    }
+    return null;
   }
 
   function hitLandmark(lm, label) {
@@ -316,8 +371,17 @@ export function createPen(el, opts = {}) {
     if (lm.kind === 'human') st.wiggleAge = 0;
     if (!reduced) burst(lm.x, lm.y, 'spark', 7, kindColor(lm.kind, pal));
     if (label) {
-      const dir = lm.side === 'top' ? 1 : -1;
-      floatText(label, lm.x, lm.y + dir * (lm.r + 16), kindColor(lm.kind, pal), dir);
+      const isl = lm.islet && layout?.islets?.find((i) => i.kind === lm.kind);
+      if (isl) {
+        // Rise from above the building, clear of its keeper; if that's off the top
+        // of the pen, drop from under its caption plank instead.
+        const base = isletBase(isl), top = base.y - buildingFootprint(isl.kind, isl.scale).top - 12;
+        if (top > 30) floatText(label, base.x, top, kindColor(lm.kind, pal), -1);
+        else floatText(label, isl.x, base.captionY + 30, kindColor(lm.kind, pal), 1);
+      } else {
+        const dir = lm.side === 'top' ? 1 : -1;
+        floatText(label, lm.x, lm.y + dir * (lm.r + 16), kindColor(lm.kind, pal), dir);
+      }
     }
   }
 
@@ -438,6 +502,8 @@ export function createPen(el, opts = {}) {
     for (const i of layout.islets) {
       const bf = buildingFootprint(i.kind, i.scale), base = isletBase(i);
       out.push({ l: base.x - bf.w / 2, r: base.x + bf.w / 2, t: base.y - bf.top, b: base.y });
+      const hb = keeperHitbox(i.kind, i.scale);
+      if (hb) out.push({ l: base.x + hb.dx - hb.r, r: base.x + hb.dx + hb.r, t: base.y + hb.dy - hb.r, b: base.y + hb.dy + hb.r });
       const sc = clamp(i.scale, 0.8, 1.2), w = (ctx.measureText(LANDMARK_LABELS[i.kind]).width + 14) * sc;
       out.push({ l: i.x - w / 2, r: i.x + w / 2, t: base.captionY, b: base.captionY + 17 * sc });
     }
@@ -612,7 +678,7 @@ export function createPen(el, opts = {}) {
       const p = projectiles[i];
       if (p.delay > 0) { p.delay -= dt; continue; }
       p.age += dt;
-      if (p.kind === 'terminal' && rnd() < 0.7) {
+      if (p.kind === 'terminal' && !p.fadeAt && rnd() < 0.7) {
         const pos = quad(p.p0, p.p1, p.p2, Math.min(1, p.age / p.dur));
         addParticle({ type: 'spark', x: pos.x, y: pos.y, vx: (rnd() - 0.5) * 30, vy: (rnd() - 0.5) * 30, life: 0.35, size: 1.5 + rnd(), color: pal.yellow, drag: 0.9 });
       }
@@ -1063,6 +1129,13 @@ export function createPen(el, opts = {}) {
     // Projectiles.
     for (const p of projectiles) {
       if (p.delay > 0) continue;
+      if (p.fadeAt) { // reduced motion: fade into the keeper's mouth, no flight
+        ctx.save();
+        ctx.globalAlpha *= 1 - clamp(p.age / p.dur, 0, 1);
+        drawProjectile(ctx, p.kind, p.fadeAt.x, p.fadeAt.y, 0, 0, pal, clamp(layout.radius / 16, 0.75, 1.25));
+        ctx.restore();
+        continue;
+      }
       const k = clamp(p.age / p.dur, 0, 1);
       const tk = p.kind === 'web' ? ease.inOutSine(k) : k;
       const pos = quad(p.p0, p.p1, p.p2, tk);
@@ -1119,6 +1192,20 @@ export function createPen(el, opts = {}) {
       ctx.fillText(f.text, x, y + 0.5);
     }
 
+    // Hover tooltip for a service keeper: just its name.
+    if (hoveredKeeper && layout.islets?.includes(hoveredKeeper)) {
+      const hb = keeperHitbox(hoveredKeeper.kind, hoveredKeeper.scale), base = isletBase(hoveredKeeper);
+      const text = KEEPER_NAMES[hoveredKeeper.kind];
+      ctx.font = '600 12px system-ui, -apple-system, Segoe UI, sans-serif';
+      const w = ctx.measureText(text).width + 16;
+      const x = clamp(base.x + hb.dx, w / 2 + 4, W - w / 2 - 4), y = Math.max(16, base.y + hb.dy - hb.r - 14);
+      ctx.fillStyle = toCss(pal.fg, 0.92);
+      roundRect(ctx, x - w / 2, y - 11, w, 22, 6); ctx.fill();
+      ctx.fillStyle = toCss(pal.bg);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(text, x, y + 0.5);
+    }
+
     // Hover tooltip: full name + status.
     const hs = hovered && sprites.get(hovered);
     if (hs && hs.life !== 'leave') {
@@ -1141,6 +1228,8 @@ export function createPen(el, opts = {}) {
     const hit = reduced ? 0 : clamp(1 - st.pulseAge / 0.9, 0, 1);
     const base = drawCarrier(ctx, 'islet', i.kind, i.x, i.y, i.scale, pal, time, { reduced });
     drawServiceBuilding(ctx, i.kind, base.x, base.y, i.scale, pal, time, { hit, waiting: i.kind === 'human' && needsYou ? 1 : 0, reduced });
+    // Its keeper stands in front, catching what's thrown at it (the phone box has none).
+    drawKeeper(ctx, i.kind, base.x, base.y, i.scale, pal, time, catchStateAt(keeperLands.get(i.kind) || [], time), { reduced });
   }
 
   // ── loop, sizing, theme, input ─────────────────────────────────────────────
@@ -1213,9 +1302,10 @@ export function createPen(el, opts = {}) {
     pointer = { x: ev.clientX - rect.left, y: ev.clientY - rect.top }; // ── personality hooks ──
     const s = pick(ev);
     hovered = s ? s.id : null;
+    hoveredKeeper = s ? null : pickKeeper(pointer.x, pointer.y); // keepers: a name on hover, no click
     canvas.style.cursor = s ? 'pointer' : '';
   };
-  const onLeave = () => { hovered = null; pointer = null; canvas.style.cursor = ''; };
+  const onLeave = () => { hovered = null; hoveredKeeper = null; pointer = null; canvas.style.cursor = ''; };
   const onClick = (ev) => {
     if (!ev.isTrusted) return; // only a real human click may open a session
     const s = pick(ev);
