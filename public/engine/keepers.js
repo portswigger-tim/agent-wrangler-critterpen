@@ -20,8 +20,8 @@ export const KEEPER_NAMES = Object.freeze({
 });
 
 const UNIT = 2.2; // same building unit as buildings.js
-/** Keeper bodies are drawn in their own units, KSIZE building units each (~28px tall at scale 1). */
-const KSIZE = 1.6;
+/** Keeper bodies are drawn in their own units, KSIZE building units each (~32px tall at scale 1). */
+export const KSIZE = 1.85;
 
 /**
  * Catch timeline: the engine starts it CATCH.lead seconds before the
@@ -123,6 +123,16 @@ export function keeperPose(kind, t, catchState = {}, reduced = false) {
   }
   if (kind === 'jira' && p >= LAND + 0.08) out.stamp = smooth((p - LAND - 0.08) / 0.1);
   return out;
+}
+
+/**
+ * Soft light rim for dark themes (null on light ones): a pale glow of the
+ * keeper's own colour around its silhouette.
+ */
+export function keeperRim(kind, pal) {
+  if (!pal.dark) return null;
+  const c = keeperColors(kind, pal);
+  return c ? { color: lighten(c.body, 0.6), alpha: 0.55, blur: 7 } : null;
 }
 
 /** Muted earthy colours for each keeper, from the scene's nature palette. */
@@ -324,6 +334,9 @@ export function drawKeeper(ctx, kind, x, y, scale, pal, t, catchState = {}, { re
   ctx.rotate(ps.rot);
   ctx.scale(ps.sx, ps.sy);
   ctx.lineJoin = 'round';
+  // Dark themes: a soft pale rim so earthy keepers don't sink into a dark islet.
+  const rim = keeperRim(kind, pal);
+  if (rim) { ctx.shadowColor = toCss(rim.color, rim.alpha); ctx.shadowBlur = rim.blur * scale; }
   body(ctx, u, c, ps, n.ink);
   ctx.restore();
 }
