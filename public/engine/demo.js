@@ -10,6 +10,7 @@ const TASKS = {
   t1: 'Checkout revamp',
   t2: 'Docs site',
   t3: 'Critter Pen',
+  t4: 'Safer Runner',
 };
 
 /** @type {import('./contract.js').Critter[]} */
@@ -24,6 +25,10 @@ let critters = [
   { id: 's-pm', name: 'Critter Pen PM', taskId: 't3', taskName: TASKS.t3, agent: 'claude', status: 'thinking' },
   { id: 's-engine', name: 'Build animation engine', taskId: 't3', taskName: TASKS.t3, agent: 'claude', status: 'working', parentId: 's-pm' },
   { id: 's-adapter', name: 'Wrangler adapter', taskId: 't3', taskName: TASKS.t3, agent: 'gemini', status: 'working', parentId: 's-pm' },
+  { id: 's-art', name: 'Critter cuteness pass', taskId: 't3', taskName: TASKS.t3, agent: 'claude', status: 'thinking', parentId: 's-pm' },
+  { id: 's-readme', name: 'Rewrite the README', taskId: 't3', taskName: TASKS.t3, agent: 'codex', status: 'finished', parentId: 's-pm' },
+  { id: 's-sudo', name: 'Safer-runner-action Ubuntu 26.04 sudo-rs fix', taskId: 't4', taskName: TASKS.t4, agent: 'claude', status: 'working' },
+  { id: 's-mitm', name: 'Safer-runner-action L7 mitmproxy', taskId: 't4', taskName: TASKS.t4, agent: 'claude', status: 'idle' },
 ];
 
 const LABELS = {
@@ -100,7 +105,7 @@ function setStatus(id, status) {
 let nextId = 1;
 function addCritter(parent) {
   const live = critters.filter((c) => c.status !== 'archived');
-  if (live.length >= 14) return null;
+  if (live.length >= 18) return null;
   const taskId = parent ? parent.taskId : pick(Object.keys(TASKS));
   const c = {
     id: `s-new-${nextId++}`, name: pick(NAMES), taskId, taskName: TASKS[taskId],

@@ -27,12 +27,21 @@ the Jira post office.
   chats with an islandmate. Eyes follow your cursor when it's close, siblings wave
   at a newly spawned critter, and a finished critter does a happy wiggle. Each
   critter's quirks are seeded from its session id, so they never fall into step.
-- **Leashes:** a dotted leash joins a session to the sessions it spawned.
-- **Names:** each critter's name sits under it. When critters crowd together, the
-  names never overlap: the critters that need you keep theirs in place, others shift
-  aside or above their heads, and a name with no room left fades to a whisper. Critters
-  waiting at the bell show their name above their heads. Hover a critter for its full
-  name.
+- **Families:** a session that spawned others is drawn bigger (about 1.35×) and stands
+  near the middle of its island, so it's the easiest critter to click. The sessions it
+  spawned are smaller (0.8×) and huddle around it. A session that is both is parent-
+  sized. Sizes ease when a child arrives or leaves.
+- **Leashes:** a little rope joins a session to the sessions it spawned, across
+  islands too.
+- **Names:** each critter's name sits under it, without the task name the island's
+  plank already shows ("Safer-runner-action L7 mitmproxy" on the Safer Runner island
+  reads "L7 mitmproxy"), and long names are cut in the middle so the end survives.
+  When critters crowd together the names never overlap: the critters that need you
+  keep theirs in place (parents first among equals, in bolder type), others shift
+  aside or above their heads, and a name with no room left fades to a whisper.
+  Critters waiting at the bell show their name above their heads. Hover a critter for
+  its full name.
+- **Personal space:** critters never stand inside each other, strolling or resting.
 - **Click:** clicking a critter opens its session on the board.
 - **Reduced motion:** the pen follows your OS reduced-motion setting live, swapping
   motion for colour and opacity changes. Personality and ambient fireflies or petals

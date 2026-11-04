@@ -32,13 +32,15 @@ export function createWander(u, v, rand) {
  * Advance one wander step: rest, then stroll to a random point, then rest again.
  * `speed` is in disk units per second; 0 means stay put (sleeping, wobbling).
  */
-export function stepWander(w, dt, rand, { speed, pauseMin = 1.2, pauseMax = 4.5 }) {
+export function stepWander(w, dt, rand, { speed, pauseMin = 1.2, pauseMax = 4.5, around = null }) {
   if (!(speed > 0)) return w;
   if (w.wait > 0) {
     w.wait -= dt;
     if (w.wait <= 0) {
-      const p = randomPoint(rand);
-      w.tu = p.u; w.tv = p.v; w.walk = 0;
+      // `around` keeps a stroll near a point: a parent near the middle, a child near its parent.
+      const p = around ? randomPoint(rand, around.rad) : randomPoint(rand);
+      const t = clampDisk({ u: (around ? around.u : 0) + p.u, v: (around ? around.v : 0) + p.v }, WANDER_R);
+      w.tu = t.u; w.tv = t.v; w.walk = 0;
     }
     return w;
   }
@@ -58,8 +60,12 @@ export function stepWander(w, dt, rand, { speed, pauseMin = 1.2, pauseMax = 4.5 
 /**
  * Nudge critters sharing an island apart so they don't stand inside each
  * other. Distances are measured in world units (`ax`, `ay` = how many px one
- * disk unit spans across and deep). Mutates the states; always stays in the disk.
- * @param {Array<{u:number,v:number}>} list
+ * disk unit spans across and deep). Items that carry `rad` (their radius in px)
+ * keep (a.rad + b.rad) × PERSONAL_SPACE / 2 apart, so big critters get more
+ * room; otherwise `minDist` applies. An item's `m` (mobility, default 1) sets
+ * how much of each push it takes, so a parent (low m) stays put while its
+ * children make room. Mutates the states; always stays in the disk.
+ * @param {Array<{u:number,v:number,rad?:number,m?:number}>} list
  * @param {number} minDist world px
  */
 export function separate(list, minDist, ax, ay, strength = 0.5) {
@@ -68,14 +74,41 @@ export function separate(list, minDist, ax, ay, strength = 0.5) {
       const a = list[i], b = list[j];
       let dx = (a.u - b.u) * ax, dy = (a.v - b.v) * ay;
       let d = Math.hypot(dx, dy);
-      if (d >= minDist) continue;
+      const need = a.rad && b.rad ? ((a.rad + b.rad) * PERSONAL_SPACE) / 2 : minDist;
+      if (d >= need) continue;
       if (d < 1e-6) { dx = i < j ? -1 : 1; dy = 0; d = 1; } // exactly stacked: split sideways
-      const push = ((minDist - d) / 2) * strength;
-      a.u += ((dx / d) * push) / ax; a.v += ((dy / d) * push) / ay;
-      b.u -= ((dx / d) * push) / ax; b.v -= ((dy / d) * push) / ay;
+      const ma = a.m ?? 1, mb = b.m ?? 1;
+      const total = (need - d) * strength;
+      const pa = (total * ma) / (ma + mb), pb = (total * mb) / (ma + mb);
+      a.u += ((dx / d) * pa) / ax; a.v += ((dy / d) * pa) / ay;
+      b.u -= ((dx / d) * pb) / ax; b.v -= ((dy / d) * pb) / ay;
       clampDisk(a, 1); clampDisk(b, 1);
     }
   }
+  return list;
+}
+
+/**
+ * Personal space, in critter radii, between two critters' feet. Bodies are at
+ * most ~1.08r wide each (size jitter, squash, breathing), so 2.5r keeps them
+ * from ever touching, standing still or strolling.
+ */
+export const PERSONAL_SPACE = 2.5;
+
+/** How many world px one disk unit spans across (ax) and deep (ay) on an island. */
+export const islandAxes = (isl, r) => ({ ax: Math.max(1, isl.rx - r * 0.9), ay: Math.max(1, isl.ry - r * 0.4) });
+
+/**
+ * Personal space counts depth at this weight: critters one behind the other
+ * keep a third more room than side by side, so a hopping front critter
+ * doesn't bump the one standing behind it.
+ */
+export const DEPTH_WEIGHT = 0.75;
+
+/** Spread spots out until no two are closer than minDist world px (as far as the island allows). */
+export function relaxSpots(spots, ax, ay, minDist, iterations = 300) {
+  const list = spots.map((p) => ({ u: p.u, v: p.v, ...(p.rad ? { rad: p.rad } : {}), ...(p.m != null ? { m: p.m } : {}) }));
+  for (let i = 0; i < iterations; i++) separate(list, minDist, ax, ay, 1);
   return list;
 }
 
