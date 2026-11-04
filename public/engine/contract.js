@@ -5,7 +5,9 @@
 // Pure module: no DOM, safe to import from Node and the browser.
 
 /**
- * @typedef {'working'|'thinking'|'needs-you'|'error'|'idle'|'archived'} CritterStatus
+ * @typedef {'working'|'thinking'|'needs-you'|'error'|'finished'|'idle'|'asleep'|'archived'} CritterStatus
+ *   finished: finished a turn, the human hasn't looked yet · idle: awake at its prompt ·
+ *   asleep: no live terminal, snoozed, or quiet for 30+ min
  */
 
 /**
@@ -56,7 +58,7 @@
  */
 
 /** @type {readonly CritterStatus[]} */
-export const STATUSES = Object.freeze(['working', 'thinking', 'needs-you', 'error', 'idle', 'archived']);
+export const STATUSES = Object.freeze(['working', 'thinking', 'needs-you', 'error', 'finished', 'idle', 'asleep', 'archived']);
 
 /** @type {readonly PenEventKind[]} */
 export const EVENT_KINDS = Object.freeze(['git', 'pr', 'jira', 'terminal', 'files', 'web', 'human', 'spawn', 'done', 'error']);
