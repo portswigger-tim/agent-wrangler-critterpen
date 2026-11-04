@@ -134,7 +134,7 @@ reason). A `view`'s `update(el, session, graph)` gets the board's wire graph:
 | `taskId`, `taskName` | `graph.tasks.assignments[sessionId]` → `graph.tasks.tasks[].name`; none = `adhoc` / "Unassigned" |
 | `parentId` | `.parentSession` (board nesting), else `.spawnedBy` (launch lineage) |
 | `needs-you` | `.status === 'needs-you'` (permission prompts, questions, API errors; reason in `.waitingFor`) |
-| `working` | `.status === 'working'` with transcript activity in the last 20 s, or `.rawStatus === 'shell'` (a Bash tool running) |
+| `working` | `.status === 'working'` with transcript activity in the last 20 s, or `.rawStatus === 'shell'` (a Bash tool running), or `idle` with `.hasBackgroundShell` (the board's green JOB) |
 | `thinking` | `.status === 'working'` and `.lastActivity` older than 20 s |
 | `error` | not working/needs-you, and one of its own PR links has `checkStatus: 'failing'` |
 | `idle` | everything else, including dormant cards; `unknown` reads idle only after 10 s (earlier it holds the previous look) |

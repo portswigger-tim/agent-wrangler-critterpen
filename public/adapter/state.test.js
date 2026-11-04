@@ -22,6 +22,18 @@ test('statusFor: a running Bash tool is never thinking, however quiet the transc
   assert.equal(statusFor(session('b', { status: 'working', hasBackgroundShell: true, lastActivity: quiet }), NOW), 'working');
 });
 
+test('statusFor: idle with a background job still running is working (the board\'s green JOB)', () => {
+  // Shape copied from a live board card ("L7 mitmproxy egress spike"): the turn
+  // ended, a background shell it started is still running.
+  const job = session('69fff775', {
+    status: 'idle', rawStatus: null, hasBackgroundShell: true, managed: true, dormant: false,
+    waitingFor: null, spawnedBy: '0069b540', subAgents: [], teammates: [], lastActivity: NOW - 60_000,
+  });
+  assert.equal(statusFor(job, NOW), 'working');
+  assert.equal(statusFor({ ...job, links: [pr(1, 'failing')] }, NOW), 'working');
+  assert.equal(statusFor({ ...job, hasBackgroundShell: false }, NOW), 'idle');
+});
+
 test('statusFor: working with no lastActivity at all is working', () => {
   assert.equal(statusFor(session('a', { status: 'working', lastActivity: null }), NOW), 'working');
 });

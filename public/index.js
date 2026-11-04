@@ -39,10 +39,6 @@ export function penOptions(api) {
   };
 }
 
-function needsYouCount(graph) {
-  return (graph?.sessions || []).filter((s) => s && !s.offBoard && s.status === 'needs-you').length;
-}
-
 export function parseActivity(msg) {
   if (msg?.kind !== 'activity' || !Array.isArray(msg.events)) return [];
   return msg.events.filter((e) => e && typeof e.sessionId === 'string' && e.sessionId && ACTIVITY_KINDS.has(e.kind)
@@ -75,7 +71,6 @@ export default {
       id: 'critters',
       label: 'Critters',
       icon: ICON,
-      badge: needsYouCount,
       mount(el, api) {
         el.classList.add('critter-pen');
         const opts = penOptions(api);
