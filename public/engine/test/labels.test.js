@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { placeLabels, visibleOverlaps, shortLabel, MAX_SHIFT, SHORT_FRACTION } from '../labels.js';
+import { placeLabels, visibleOverlaps, shortLabel, anchorSpots, shiftLimits } from '../labels.js';
 import { islandSize, islandPoint, homeSpots } from '../layout.js';
 import { createWander, stepWander, separate, wanderPace, PERSONAL_SPACE, DEPTH_WEIGHT } from '../wander.js';
 import { rng, truncateMiddle as shorten } from '../util.js';
@@ -20,7 +20,7 @@ test('wandering crowds: no overlapping labels, every name near its owner, most r
     crowd = homeSpots(k, 77).map((p, i) => ({
       w: createWander(p.u, p.v, rand),
       text: shorten(NAMES[i % NAMES.length], labelWidth, measure),
-      short: shortLabel(NAMES[i % NAMES.length], labelWidth * SHORT_FRACTION, measure),
+      short: shortLabel(NAMES[i % NAMES.length], labelWidth, measure),
       status: ['working', 'thinking', 'idle'][i % 3],
     }));
     let shown = 0, total = 0;
@@ -34,10 +34,12 @@ test('wandering crowds: no overlapping labels, every name near its owner, most r
       }), measure);
       assert.deepEqual(visibleOverlaps(placed), [], `k=${k} step ${step}`);
       for (const l of placed) {
-        const moved = Math.hypot(l.x - l.home.x, l.y - l.home.y);
-        assert.ok(moved <= r * MAX_SHIFT + 1e-6, `k=${k} step ${step}: ${l.id}'s name strayed ${moved.toFixed(1)}px`);
+        // Every name stays within a nudge of one of its owner's two anchors.
         const own = pt(Number(l.id.slice(1)));
-        assert.ok(Math.abs(l.x - own.x) <= r * MAX_SHIFT + 1e-6 && l.y - own.y <= 10 + r * MAX_SHIFT + 1e-6, `${l.id} stays with its owner`);
+        const it = { x: own.x, groundY: own.y, r };
+        const { dx, dy } = shiftLimits(it);
+        const near = anchorSpots(it).some((a) => Math.abs(l.x - a.x) <= dx + 1e-6 && Math.abs(l.y - a.y) <= dy + 1e-6);
+        assert.ok(near, `k=${k} step ${step}: ${l.id}'s name strayed to (${l.x.toFixed(0)},${l.y.toFixed(0)})`);
       }
       shown += placed.filter((p) => p.visible).length;
       total += placed.length;
@@ -153,11 +155,99 @@ test('names never sit on another critter\'s body', () => {
   for (const p of placed.filter((q) => !q.visible)) assert.deepEqual([p.x, p.y], [p.home.x, p.home.y]);
 });
 
-test('short forms keep the distinguishing last word', () => {
+test('short forms are the first whole word, or nothing', () => {
   const m = (t) => t.length * 7;
-  assert.equal(shortLabel('Investigate CI timeouts', 70, m), '…timeouts');
-  assert.equal(shortLabel('Wrangler adapter', 70, m), '…adapter');
-  assert.equal(shortLabel('PM', 70, m), 'PM');
-  const long = shortLabel('Supercalifragilistic', 70, m);
-  assert.ok(m(long) <= 70 && long.includes('…'));
+  assert.equal(shortLabel('Investigate CI timeouts', 140, m), 'Investigate…');
+  assert.equal(shortLabel('L7 mitmproxy', 140, m), 'L7…');
+  assert.equal(shortLabel('Review PR #2 skip hooks', 140, m), 'Review…');
+  assert.equal(shortLabel('#2 skip hooks', 140, m), 'skip…', 'skips a punctuation-only word');
+  assert.equal(shortLabel('PM', 140, m), '', 'single word: no short form');
+  assert.equal(shortLabel('Investigate CI timeouts', 50, m), '', 'too narrow: nothing, never a fragment');
+});
+
+const BOARD = ['Ubuntu 26.04 sudo-rs fix', 'L7 mitmproxy egress spike for safer-runner-action v2', 'L7 mitmproxy',
+  'Review PR #2 skip hooks on empty mode', 'Investigate CI timeouts', 'Refactor cart service', 'Critter Pen PM',
+  'Safer-runner-action', 'Wrangler adapter', 'Fix flaky payment tests', 'Supercalifragilisticexpialidocious'];
+
+/** A shortened name is a fragment if a cut word keeps fewer than 4 letters, or both end words are cut. */
+function fragmentProblem(original, out) {
+  if (out === '' || out === original) return null;
+  const words = new Set(original.split(/\s+/));
+  const parts = out.split('…');
+  if (parts.length !== 2) return 'not exactly one ellipsis';
+  const left = parts[0].trim().split(/\s+/).filter(Boolean), right = parts[1].trim().split(/\s+/).filter(Boolean);
+  const lw = left[left.length - 1], rw = right[0];
+  const cutL = lw !== undefined && !words.has(lw), cutR = rw !== undefined && !words.has(rw);
+  if (cutL && lw.length < 4) return `left fragment "${lw}"`;
+  if (cutR && rw.length < 4) return `right fragment "${rw}"`;
+  if (cutL && cutR && original.split(/\s+/).length > 1) return 'cuts inside both end words';
+  if (!lw && !rw) return 'empty around the ellipsis';
+  return null;
+}
+
+test('no fragments: shortened names never keep a stub of a word, at any width', () => {
+  const m = (t) => t.length * 6.8;
+  for (const name of BOARD) {
+    for (let w = 20; w <= 260; w += 4) {
+      for (const out of [truncateMiddle(name, w, m), shortLabel(name, w, m)]) {
+        assert.ok(m(out) <= w || out === '', `${name} @${w}: "${out}" too wide`);
+        const why = fragmentProblem(name, out);
+        assert.equal(why, null, `${name} @${w}: "${out}" (${why})`);
+      }
+    }
+  }
+});
+
+test('a short name with clear space shows in full, even beside a busy neighbour', () => {
+  const m = (t) => t.length * 7;
+  // The live-board case: a working neighbour's name placed first, feet 3px apart.
+  const items = [
+    { id: 'sudo', text: 'Ubuntu … fix', x: 785, groundY: 334, r: 15, status: 'working' },
+    { id: 'mitm', text: 'L7 mitmproxy', short: 'L7…', x: 716, groundY: 331, r: 17, status: 'idle' },
+  ];
+  const mitm = placeLabels(items, m).find((p) => p.id === 'mitm');
+  assert.ok(mitm.visible && mitm.text === 'L7 mitmproxy', `got "${mitm.text}" visible=${mitm.visible}`);
+});
+
+test('a name that would cover a full name is hidden, not whispered underneath', () => {
+  const m = (t) => t.length * 7;
+  const items = [
+    { id: 'readme', text: 'Rewrit… README', x: 185, groundY: 264, r: 14, status: 'finished' },
+    { id: 'art', text: 'Critter … pass', x: 225, groundY: 271, r: 13, status: 'thinking' },
+    { id: 'pm', text: 'PM', x: 205, groundY: 230, r: 22, status: 'thinking', parent: true },
+    { id: 'eng', text: 'Build … engine', x: 250, groundY: 240, r: 13, status: 'working' },
+  ];
+  const placed = placeLabels(items, m);
+  const full = placed.filter((p) => p.visible);
+  for (const p of placed.filter((q) => !q.visible && !q.hidden)) {
+    for (const f of full) {
+      assert.ok(!(p.box.l < f.box.r && p.box.r > f.box.l && p.box.t < f.box.b && p.box.b > f.box.t), `${p.id} whispers under ${f.id}`);
+    }
+  }
+});
+
+test('a parent keeps its name even with busy children around it', () => {
+  const m = (t) => t.length * 7;
+  const items = [
+    { id: 'pm', text: 'PM', x: 227, groundY: 202, r: 22, status: 'thinking', parent: true },
+    { id: 'eng', text: 'Build … engine', x: 262, groundY: 205, r: 13, status: 'working' },
+    { id: 'ad', text: 'Wrangler adapter', x: 190, groundY: 208, r: 13, status: 'working' },
+    { id: 'art', text: 'Critter … pass', x: 225, groundY: 262, r: 13, status: 'thinking' },
+  ];
+  const pm = placeLabels(items, m).find((p) => p.id === 'pm');
+  assert.ok(pm.visible, 'parent name shown');
+});
+
+test('names stay inside the pen', () => {
+  const m = (t) => t.length * 7;
+  // A big critter near the top edge whose name can't go under its feet.
+  const items = [
+    { id: 'top', text: 'Refactor service', x: 100, groundY: 60, r: 27, status: 'working' },
+    { id: 'below', text: 'Blocker', x: 100, groundY: 100, r: 20, status: 'needs-you' },
+  ];
+  const bounds = { l: 0, t: 0, r: 400, b: 300 };
+  for (const p of placeLabels(items, m, [{ l: 0, r: 400, t: 62, b: 120 }], bounds)) {
+    if (p.hidden) continue;
+    assert.ok(p.box.t >= 0 && p.box.l >= 0 && p.box.r <= 400 && p.box.b <= 300, `${p.id} at ${JSON.stringify(p.box)}`);
+  }
 });

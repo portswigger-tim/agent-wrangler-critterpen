@@ -39,9 +39,10 @@ the Jira post office.
   and last survive ("Investigate … timeouts"). Names never sit on another critter, and
   when critters crowd together the names never overlap. A name always stays with its
   critter: the critters that need you keep theirs in place (parents first among
-  equals, in bolder type), others nudge a little or show just their last word
-  ("…timeouts"), and a name with no room nearby fades to a whisper rather than
-  wandering off.
+  equals, in bolder type), others nudge a little, move just above their critter's head,
+  or show just their first word ("Investigate…"). A name is never cut to a meaningless
+  stub. With no room nearby it fades to a whisper, or is hidden if a whisper would sit
+  under another name; hovering always shows it.
   Critters waiting at the bell show their name above their heads. Hover a critter for
   its full name.
 - **Personal space:** critters never stand inside each other, strolling or resting.

@@ -118,11 +118,18 @@ export function truncateToWidth(text, maxWidth, measure) {
   return text.slice(0, lo).trimEnd() + ell;
 }
 
+/** Fewest characters kept on a side of a cut inside a word: shorter is a fragment. */
+export const MIN_CUT = 4;
+
 /**
- * Like truncateToWidth, but cuts from the middle so both ends survive: the
- * tail of a session name is often what tells two apart. Whole words are
- * dropped from the middle, keeping the first and last ("Investigate … timeouts");
- * only a name that can't keep two whole words is cut inside a word.
+ * Shorten a name from the middle so both ends survive: the tail of a session
+ * name is often what tells two apart. In order of preference:
+ *  1. drop whole middle words, keeping the first and last ("Investigate … timeouts");
+ *  2. keep the last word whole and cut the first, keeping ≥ MIN_CUT of it ("Inves… timeouts");
+ *  3. the first whole word ("Investigate…");
+ *  4. a cut inside a single word, ≥ MIN_CUT each side ("Safe…tion"), or just its start ("Safe…");
+ *  5. nothing, rather than a fragment.
+ * It never cuts inside both end words.
  * @param {string} text
  * @param {number} maxWidth
  * @param {(s: string) => number} measure
@@ -130,39 +137,42 @@ export function truncateToWidth(text, maxWidth, measure) {
 export function truncateMiddle(text, maxWidth, measure) {
   if (measure(text) <= maxWidth) return text;
   const ell = '…';
-  if (measure(ell) > maxWidth) return '';
+  const fits = (t) => measure(t) <= maxWidth;
   const words = text.trim().split(/\s+/);
-  const last = words[words.length - 1];
+  const first = words[0], last = words[words.length - 1];
   if (words.length >= 3) {
     const join = (h, t) => `${words.slice(0, h).join(' ')} ${ell} ${words.slice(words.length - t).join(' ')}`;
-    if (measure(join(1, 1)) <= maxWidth) {
+    if (fits(join(1, 1))) {
       let head = 1, tail = 1;
       // Grow from the tail first (it tells sessions apart), always dropping at least one word.
       for (;;) {
-        if (head + tail + 1 < words.length && measure(join(head, tail + 1)) <= maxWidth) tail++;
-        else if (head + tail + 1 < words.length && measure(join(head + 1, tail)) <= maxWidth) head++;
+        if (head + tail + 1 < words.length && fits(join(head, tail + 1))) tail++;
+        else if (head + tail + 1 < words.length && fits(join(head + 1, tail))) head++;
         else break;
       }
       return join(head, tail);
     }
   }
-  // Still too long: keep the last word whole and shorten the first ("Inves… timeouts").
-  if (words.length >= 2 && measure(`${words[0][0]}${ell} ${last}`) <= maxWidth) {
-    let n = words[0].length - 1;
-    while (n > 1 && measure(`${words[0].slice(0, n)}${ell} ${last}`) > maxWidth) n--;
-    return `${words[0].slice(0, n)}${ell} ${last}`;
+  if (words.length >= 2) {
+    for (let n = first.length - 1; n >= MIN_CUT; n--) {
+      const t = `${first.slice(0, n)}${ell} ${last}`;
+      if (fits(t)) return t;
+    }
+    if (fits(`${first}${ell}`)) return `${first}${ell}`;
   }
-  const fit = (n) => {
-    const head = Math.ceil(n * 0.4), tail = n - head;
-    return text.slice(0, head).trimEnd() + ell + (tail ? text.slice(text.length - tail).trimStart() : '');
-  };
-  let lo = 0, hi = text.length - 1;
-  while (lo < hi) {
-    const mid = (lo + hi + 1) >> 1;
-    if (measure(fit(mid)) <= maxWidth) lo = mid;
-    else hi = mid - 1;
+  // One word left to work with (or the first word alone is too long).
+  const w = words.length >= 2 ? first : text.trim();
+  for (let n = w.length - 1; n >= 2 * MIN_CUT; n--) {
+    const head = Math.max(MIN_CUT, Math.ceil(n * 0.45)), tail = n - head;
+    if (tail < MIN_CUT) continue;
+    const t = `${w.slice(0, head)}${ell}${w.slice(w.length - tail)}`;
+    if (words.length === 1 && fits(t)) return t;
   }
-  return fit(lo);
+  for (let n = w.length - 1; n >= MIN_CUT; n--) {
+    const t = `${w.slice(0, n)}${ell}`;
+    if (fits(t)) return t;
+  }
+  return '';
 }
 
 /** Point on a quadratic bezier. */
