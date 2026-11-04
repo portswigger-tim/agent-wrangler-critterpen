@@ -1,21 +1,85 @@
-# agent-wrangler-workshop
+# Critter Pen
 
-Critter Pen: an [Agent Wrangler](https://github.com/portswigger-tim/agent-wrangler)
-extension that shows every session as an animated critter. See [DESIGN.md](DESIGN.md)
-for the product and the contract, and [docs/activity-feed.md](docs/activity-feed.md)
-for where tool activity comes from.
+An [Agent Wrangler](https://github.com/portswigger-tim/agent-wrangler) extension that
+shows every session as a small round critter living on floating islands. Each task is
+an island. A critter's colour and antics are its session's status. When a session
+does something, its critter throws something at the matching building on the
+mainland: commit dots at the git tree, a paper plane at the PR mailbox, a ticket at
+the Jira post office.
 
-## Layout
+![Critter Pen in the dark theme](public/engine/docs/pen-dark.png)
+
+## What you'll see
+
+| Critter | Session |
+| --- | --- |
+| Green, hopping | Working: running tools, or a background job (the board's **JOB**) |
+| Blue, bobbing with "…" | Thinking: working but quiet for a while, or waiting on sessions it spawned |
+| Amber, "!", at the bell | Needs you: a permission prompt, a question or an API error |
+| Red, dizzy, smoking | One of its own PRs has failing checks |
+| Awake, with a ✓ | Finished a turn you haven't looked at yet |
+| Awake and relaxed | Idle at its prompt |
+| Asleep, "z z z" | No live terminal (the board's **RESUME**), snoozed, or quiet for 30+ min |
+| Waves and walks off | Archived |
+
+- **Islands:** sessions without a task share a small rocky islet.
+- **Leashes:** a dotted leash joins a session to the sessions it spawned.
+- **Click:** clicking a critter opens its session on the board.
+- **Reduced motion:** the pen follows your OS reduced-motion setting live, swapping
+  motion for colour and opacity changes.
+- **Themes:** colours come from the board theme, so every Agent Wrangler theme works.
+
+Critter Pen deliberately shows no "needs you" counts or badges.
+
+## Install
+
+In Agent Wrangler, open **Settings → Extensions → + Add extension → Git URL** and paste:
+
+```
+https://github.com/portswigger-tim/agent-wrangler-critterpen
+```
+
+Review the requested capabilities, approve, and **Critters** appears on the rail:
+
+- `sessions:read`: the board's sessions, to draw the critters.
+- `board:broadcast`: tool activity sent to the browser (see below).
+
+It has no dependencies and needs no build step.
+
+## Where the activity comes from
+
+Statuses, PR and Jira links, and spawn lineage come from the board graph. Per-tool
+activity (git, shell, file edits, web) isn't in the graph, so a server-side sweep
+tails each live Claude session's transcript and classifies its tool calls. Labels are
+only ever chosen from a fixed vocabulary, such as `git push`, `#482` or `PROJ-123`.
+Command text, file paths, URLs and tool output never leave the server. Sessions it
+can't attribute with certainty, such as two sessions sharing one working directory,
+are skipped. Codex sessions show status but not tool activity for now. Details are in
+[docs/activity-feed.md](docs/activity-feed.md).
+
+## Repository layout
 
 | Path | What |
 | --- | --- |
-| `package.json`, `index.js` | Extension declaration and manifest (`critter-pen`): the Critters `view`, the activity sweep |
+| `package.json`, `index.js` | Extension declaration and manifest (`critter-pen`): the Critters `view` and the activity sweep |
 | `public/index.js` | Browser entry: feeds each board graph through the adapter into the renderer |
-| `public/adapter/` | Pure graph → `PenState` / `PenEvent[]` diffing (runs in the browser and under `node --test`) |
-| `public/engine/` | The renderer (`pen.js`), built separately; `public/placeholder-pen.js` stands in until it is present |
+| `public/adapter/` | Pure graph → `PenState` / `PenEvent[]` mapping (runs in the browser and under `node --test`) |
+| `public/engine/` | The Canvas renderer (`pen.js`, `scene.js`, `art.js`, …), with no Agent Wrangler dependency, plus a standalone demo |
 | `server/` | The activity sweep: transcript tool use → classified events, broadcast to the browser |
+| `DESIGN.md` | Product brief, visual language, and the adapter ↔ engine contract |
 
-## Local install and development
+## Development
+
+### Engine demo (no Agent Wrangler needed)
+
+```bash
+cd public/engine && python3 -m http.server
+# open http://localhost:8000/demo.html
+```
+
+Fake sessions, buttons to force every status and event, and a light/dark toggle.
+
+### Against a real board
 
 Develop against an **isolated** wrangler, never your real `~/.agent-wrangler`.
 
@@ -24,25 +88,19 @@ Develop against an **isolated** wrangler, never your real `~/.agent-wrangler`.
 export AW_DATA_DIR=/tmp/aw-critters
 scripts/dev-install.sh
 
-# 2. Start a second wrangler on that data dir and its own port, from your
-#    agent-wrangler checkout.
+# 2. From your agent-wrangler checkout, start a second wrangler on that data dir
+#    and its own port.
 cd ../agent-wrangler
 AW_DEV=1 AW_DATA_DIR=/tmp/aw-critters AW_PORT=7991 node server/index.js
 ```
 
-Open <http://localhost:7991>. **Critters** is on the rail, and the extension is listed
-under Settings → Extensions → Installed.
-Dispatch a session or two on that board to see critters. Sessions on your main board
-don't show up there.
+Open <http://localhost:7991> and dispatch a session or two to see critters. Sessions
+on your main board don't show up there. Hand-placed extensions load at boot, so after
+changing code, run `scripts/dev-install.sh` again and restart the dev wrangler.
 
-Hand-placed extensions load at boot, so after changing code, run
-`scripts/dev-install.sh` again and restart the dev wrangler. There's no build step.
-
-## Tests
+### Tests
 
 ```bash
-npm test   # node --test: adapter, activity classifier and sweep
+npm test                          # everything: adapter, contract, classifier, sweep, engine
+cd public/engine && npm test      # engine only
 ```
-
-The contract tests validate the adapter's output with the engine's
-`public/engine/contract.js` and are skipped when the engine is not present.
