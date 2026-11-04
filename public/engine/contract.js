@@ -1,5 +1,7 @@
 // Critter Pen contract — the only thing the adapter and the engine share.
 // Mirrors the "Contract" section of DESIGN.md; change both together.
+// Lives in public/engine/ because the wrangler only serves <ext>/public/;
+// keep every import relative and inside this folder.
 // Pure module: no DOM, safe to import from Node and the browser.
 
 /**
@@ -7,7 +9,7 @@
  */
 
 /**
- * @typedef {'git'|'pr'|'jira'|'terminal'|'files'|'web'|'human'|'spawn'|'done'} PenEventKind
+ * @typedef {'git'|'pr'|'jira'|'terminal'|'files'|'web'|'human'|'spawn'|'done'|'error'} PenEventKind
  */
 
 /**
@@ -32,6 +34,9 @@
  * @property {string} critterId
  * @property {PenEventKind} kind
  * @property {string} [label]       e.g. "PROJ-123", "#482", "git push"
+ *
+ * 'error' is a one-shot effect with no landmark (smoke puff + wobble); the
+ * persistent red comes from status 'error'.
  */
 
 /**
@@ -52,7 +57,7 @@
 export const STATUSES = Object.freeze(['working', 'thinking', 'needs-you', 'error', 'idle', 'archived']);
 
 /** @type {readonly PenEventKind[]} */
-export const EVENT_KINDS = Object.freeze(['git', 'pr', 'jira', 'terminal', 'files', 'web', 'human', 'spawn', 'done']);
+export const EVENT_KINDS = Object.freeze(['git', 'pr', 'jira', 'terminal', 'files', 'web', 'human', 'spawn', 'done', 'error']);
 
 /** Event kinds that fire a projectile at a landmark on the pen edge. */
 export const LANDMARK_KINDS = Object.freeze(['git', 'pr', 'jira', 'terminal', 'files', 'web', 'human']);
