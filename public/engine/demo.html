@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Critter Pen</title>
+<style>
+  :root, :root[data-theme="dark"] {
+    --bg: #12151b;
+    --surface: #1a1f27;
+    --surface-2: #3a414b;
+    --fg: #e6edf3;
+    --muted: #8b949e;
+    --border: #2a313b;
+    --green: #56d364;
+    --blue: #6ca7ff;
+    --yellow: #f5c542;
+    --red: #ff6b6b;
+    --accent: #bc8cff;
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f1ea;
+    --surface: #fffdf8;
+    --surface-2: #cfd3da;
+    --fg: #23262d;
+    --muted: #6b6f78;
+    --border: #e2ddd2;
+    --green: #2fa84f;
+    --blue: #3b7ddd;
+    --yellow: #e9a514;
+    --red: #e5484d;
+    --accent: #8e5bd8;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    transition: background .3s, color .3s;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 17px; margin: 0; letter-spacing: .01em; display: flex; gap: 8px; align-items: center; }
+  header h1 .dot { width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff8 0 15%, transparent 16%), var(--green); box-shadow: inset -2px -3px 0 #0002; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  header .spacer { flex: 1; }
+  button, .toggle {
+    font: inherit; font-size: 13px; color: var(--fg); background: var(--surface);
+    border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px; transition: transform .08s, background .2s, border-color .2s;
+  }
+  button:hover { border-color: var(--muted); }
+  button:active { transform: scale(.96); }
+  button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  .swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  main { display: grid; grid-template-columns: 1fr 300px; min-height: 0; }
+  #pen { position: relative; min-height: 420px; }
+  aside {
+    border-left: 1px solid var(--border); background: var(--surface); padding: 14px 16px;
+    overflow: auto; display: flex; flex-direction: column; gap: 16px;
+  }
+  aside h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 0 0 8px; }
+  .who { font-weight: 650; font-size: 15px; }
+  .who small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+  .grid { display: flex; flex-wrap: wrap; gap: 6px; }
+  #log { list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
+  #log li b { color: var(--fg); font-weight: 600; }
+  #log li { animation: in .3s ease-out; }
+  @keyframes in { from { opacity: 0; transform: translateY(-4px); } }
+  footer { border-top: 1px solid var(--border); padding: 8px 16px 12px; }
+  footer .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-bottom: 4px; }
+  #tray { height: 110px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+  .hint { font-size: 12px; color: var(--muted); }
+  @media (max-width: 760px) {
+    main { grid-template-columns: 1fr; }
+    aside { border-left: 0; border-top: 1px solid var(--border); }
+    #pen { min-height: 460px; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1><span class="dot"></span>Critter Pen</h1>
+    <span class="sub">every agent session as a tiny creature</span>
+    <span class="spacer"></span>
+    <button id="play" aria-pressed="true" title="Fake event generator">▶ Live</button>
+    <button id="theme" title="Toggle light / dark">◐ Theme</button>
+    <button id="motion" aria-pressed="false" title="Simulate prefers-reduced-motion">Reduced motion</button>
+    <button id="add">＋ Session</button>
+  </header>
+  <main>
+    <div id="pen"></div>
+    <aside>
+      <section>
+        <h2>Selected critter</h2>
+        <div class="who" id="who">—</div>
+        <div class="hint">Click a critter to select it.</div>
+      </section>
+      <section>
+        <h2>Force status</h2>
+        <div class="grid" id="statuses"></div>
+      </section>
+      <section>
+        <h2>Fire event</h2>
+        <div class="grid" id="events"></div>
+      </section>
+      <section>
+        <h2>Activity</h2>
+        <ul id="log"></ul>
+      </section>
+    </aside>
+  </main>
+  <footer>
+    <div class="lbl">Compact tray (board.tray preview)</div>
+    <div id="tray"></div>
+  </footer>
+  <script type="module" src="./demo.js"></script>
+</body>
+</html>

@@ -55,14 +55,14 @@ Two independent pieces with one contract between them.
  └────────────────────────────────────────────────────────────────┘
 ```
 
-- **`engine/`** — framework-free ES module, Canvas 2D (or SVG if it stays fast).
+- **`public/engine/`** — framework-free ES module, Canvas 2D (or SVG if it stays fast).
   Knows nothing about Agent Wrangler. Ships a standalone `demo.html` driven by a fake
   event generator so it can be developed and shown off in any browser.
 - **Extension (`index.js`, `package.json`, `public/`)** — the wrangler manifest and
   client entry. Registers a `view` contribution ("Critters" rail button) and later a
   `board.tray` mini-pen. Adapter diffs successive board graphs into the contract below.
 
-### Contract: `engine/contract.js`
+### Contract: `public/engine/contract.js`
 
 ```js
 // Snapshot, applied on every graph tick (idempotent).
@@ -80,20 +80,21 @@ Two independent pieces with one contract between them.
 // Discrete things that happened since the last tick (fire-and-forget animations).
 /** @typedef {{
  *   critterId: string,
- *   kind: 'git'|'pr'|'jira'|'terminal'|'files'|'web'|'human'|'spawn'|'done',
+ *   kind: 'git'|'pr'|'jira'|'terminal'|'files'|'web'|'human'|'spawn'|'done'|'error',
  *   label?: string,          // e.g. "PROJ-123", "#482", "git push"
  * }} PenEvent */
 
 // Engine API
-// createPen(el, { theme?: 'auto', reducedMotion?: boolean }) -> {
+// createPen(el, { theme?: 'auto', reducedMotion?: boolean, onCritterClick?: (id) => void }) -> {
 //   setState(PenState), emit(PenEvent), resize(), destroy()
 // }
 ```
 
 `spawn` makes the parent fire a "baby" critter that pops into existence; `done`
-triggers a little celebration before going idle.
+triggers a little celebration before going idle; `error` is a one-shot smoke puff
+and wobble with no landmark (the persistent red comes from status `error`).
 
-Either side may propose additions to the contract; change `engine/contract.js` and
+Either side may propose additions to the contract; change `public/engine/contract.js` and
 `DESIGN.md` together and tell the other side.
 
 ## Data sources (adapter)
