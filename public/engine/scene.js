@@ -1,5 +1,5 @@
-// Scenery: floating islands, their signposts, the mainland strip and the
-// landmark buildings on it. Draw-only; positions come from layout.js.
+// Scenery: floating islands, their signposts, leashes, and the compact tray's
+// small landmark buildings. Draw-only; positions come from layout.js.
 
 import { TAU, rng } from './util.js';
 import { toCss, mix, lighten, darken, parseColor } from './color.js';
@@ -233,33 +233,6 @@ export function drawLeash(ctx, a, b, pal, alpha = 1, twist = 0) {
   ctx.strokeStyle = toCss(st.twist, 0.8 * alpha);
   ctx.lineWidth = st.width * 0.55;
   ctx.stroke();
-  ctx.restore();
-}
-
-/** The mainland strip along the bottom: a wavy grass edge over earth. */
-export function drawMainland(ctx, m, pal) {
-  const n = naturePalette(pal);
-  const wave = (x) => Math.sin(x * 0.02) * 4 + Math.sin(x * 0.051 + 1.3) * 2.5;
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(m.x, m.y + m.h);
-  for (let x = m.x; x <= m.x + m.w + 8; x += 8) ctx.lineTo(x, m.y + 10 + wave(x));
-  ctx.lineTo(m.x + m.w, m.y + m.h);
-  ctx.closePath();
-  const g = ctx.createLinearGradient(0, m.y, 0, m.y + m.h);
-  g.addColorStop(0, toCss(n.dirt));
-  g.addColorStop(1, toCss(n.dirtDark));
-  ctx.fillStyle = g;
-  ctx.fill();
-  ctx.beginPath();
-  for (let x = m.x; x <= m.x + m.w + 8; x += 8) ctx.lineTo(x, m.y + wave(x));
-  for (let x = m.x + m.w + 8; x >= m.x; x -= 8) ctx.lineTo(x, m.y + m.h * 0.6 + wave(x) * 0.5);
-  ctx.closePath();
-  const gg = ctx.createLinearGradient(0, m.y, 0, m.y + m.h * 0.6);
-  gg.addColorStop(0, toCss(lighten(n.grass, 0.08)));
-  gg.addColorStop(1, toCss(n.grassDark));
-  ctx.fillStyle = gg;
-  ctx.fill();
   ctx.restore();
 }
 

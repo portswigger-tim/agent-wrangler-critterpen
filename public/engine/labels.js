@@ -8,7 +8,7 @@ export const LABEL_PRIORITY = ['needs-you', 'finished', 'working', 'thinking', '
 
 const LABEL_H = 16;
 /** Most a label above the head will rise to clear a hat or bubble (px). */
-export const MAX_HEADROOM = 22;
+export const MAX_HEADROOM = 14;
 
 const loose = (s) => String(s || '').toLowerCase().replace(/[\s_-]+/g, ' ').trim();
 
@@ -66,7 +66,9 @@ export const MAX_SHIFT = 1;
 /** Where a label wants to be: under the feet, and just over the head as the second choice. */
 export function anchorSpots(it) {
   const below = { x: it.x, y: it.groundY + 10 };
-  const above = { x: it.x, y: it.groundY - it.r * 2 - LABEL_H / 2 - 3 - Math.min(it.headroom || 0, MAX_HEADROOM) };
+  // Measured from the head as drawn (role size and hops included), not from the ground.
+  const headTop = it.body ? it.body.cy - it.body.cr : it.groundY - it.r * 2;
+  const above = { x: it.x, y: headTop - LABEL_H / 2 - 3 - Math.min(it.headroom || 0, MAX_HEADROOM) };
   return it.above ? [above, below] : [below, above];
 }
 
@@ -85,9 +87,11 @@ function candidates(it) {
   const { dx, dy } = shiftLimits(it);
   const out = [];
   anchorSpots(it).forEach((a, i) => {
-    const away = a.y > it.groundY ? 1 : -1; // never nudge into the body
+    const below = a.y > it.groundY;
+    const away = below ? 1 : -1; // never nudge into the body
     const grid = [];
-    for (const fy of [0, 0.5, 0.8, 1]) {
+    // Over the head it only slides sideways: any higher and it floats off.
+    for (const fy of below ? [0, 0.5, 0.8, 1] : [0]) {
       for (const fx of [0, -0.5, 0.5, -1, 1]) {
         if (Math.hypot(fx, fy) <= 1 + 1e-9) grid.push({ x: fx * dx, y: away * fy * dy, d: Math.hypot(fx, fy) });
       }

@@ -83,9 +83,9 @@ test('a label placed above the head clears the headroom of a hat or bubble', () 
   const measure = (t) => t.length * 7;
   const base = { id: 'q', text: 'Write API reference', x: 500, groundY: 700, r: 18, status: 'needs-you', above: true };
   const [plain] = placeLabels([base], measure);
-  const [raised] = placeLabels([{ ...base, headroom: 20 }], measure);
-  assert.equal(plain.y - raised.y, 20);
-  assert.ok(raised.box.b < 700 - 18 * 2 - 20, 'label bottom sits above head + headroom');
+  const [raised] = placeLabels([{ ...base, headroom: 10 }], measure);
+  assert.equal(plain.y - raised.y, 10);
+  assert.ok(raised.box.b < 700 - 18 * 2 - 10, 'label bottom sits above head + headroom');
   // ...but never drifts far above: tall headroom is capped.
   const [tall] = placeLabels([{ ...base, headroom: 60 }], measure);
   assert.equal(plain.y - tall.y, MAX_HEADROOM);
@@ -249,5 +249,29 @@ test('names stay inside the pen', () => {
   for (const p of placeLabels(items, m, [{ l: 0, r: 400, t: 62, b: 120 }], bounds)) {
     if (p.hidden) continue;
     assert.ok(p.box.t >= 0 && p.box.l >= 0 && p.box.r <= 400 && p.box.b <= 300, `${p.id} at ${JSON.stringify(p.box)}`);
+  }
+});
+
+test('each name stays within the tether of its OWN body: crowned parent beside a small child', () => {
+  const m = (t) => t.length * 7;
+  // Drawn bodies: a 1.35x parent mid-hop with a crown, a 0.8x child, packed together
+  // so neither name fits under its feet (the Checkout island case).
+  const R = 20, pr = R * 1.35, cr = R * 0.8;
+  const items = [
+    { id: 'parent', text: 'Refactor … service', x: 300, groundY: 200, r: pr, parent: true, status: 'working', headroom: 26,
+      body: { cx: 300, cy: 200 - pr - 6, cr: pr } },
+    { id: 'child', text: 'Investigate … timeouts', x: 262, groundY: 196, r: cr, status: 'thinking', headroom: 8,
+      body: { cx: 262, cy: 196 - cr, cr } },
+    { id: 'front', text: 'Fix flaky … tests', x: 290, groundY: 238, r: R, status: 'error', body: { cx: 290, cy: 238 - R, cr: R } },
+  ];
+  const placed = placeLabels(items, m);
+  for (const p of placed) {
+    if (p.hidden) continue;
+    const it = items.find((x) => x.id === p.id), b = it.body;
+    const body = { l: b.cx - b.cr, r: b.cx + b.cr, t: b.cy - b.cr, b: b.cy + b.cr };
+    const gapY = p.box.t >= body.b ? p.box.t - body.b : p.box.b <= body.t ? body.t - p.box.b : 0;
+    const tether = Math.max(it.r, 20) + 4; // about a radius, at least a line
+    assert.ok(gapY <= tether, `${p.id}'s name is ${gapY.toFixed(0)}px from its body (tether ${tether})`);
+    assert.ok(Math.abs(p.x - b.cx) <= it.r * 1.0 + 1e-6, `${p.id}'s name slid ${Math.abs(p.x - b.cx).toFixed(0)}px sideways`);
   }
 });

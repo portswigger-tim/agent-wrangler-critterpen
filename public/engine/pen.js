@@ -5,8 +5,10 @@ import { LANDMARK_KINDS, STATUSES, isPenEvent } from './contract.js';
 import { critterTraits, rng, clamp, lerp, ease, springStep, truncateToWidth, truncateMiddle, quad, quadAngle, arcControl, TAU } from './util.js';
 import { readTheme, toCss, mix, lighten, darken, statusColor } from './color.js';
 import { computeLayout, islandPoint, pickAt, LANDMARK_LABELS } from './layout.js';
-import { createWander, stepWander, wanderPace, separate, bellSlot, islandAxes, PERSONAL_SPACE, DEPTH_WEIGHT } from './wander.js';
-import { drawIsland, drawSignpost, drawMainland, drawBuilding, drawLeash } from './scene.js';
+import { createWander, stepWander, wanderPace, separate, islandAxes, PERSONAL_SPACE, DEPTH_WEIGHT } from './wander.js';
+import { drawIsland, drawSignpost, drawBuilding, drawLeash } from './scene.js';
+import { drawCarrier, drawServiceBuilding, drawCaptionPlank, isletFootprint, isletBob, bellQueueSlots, buildingFootprint,
+  PHONE_HOLDER_SLOT, phoneSocket, receiverSpot, drawPhoneReceiver } from './buildings.js';
 import { placeLabels, stripTaskPrefix, shortLabel } from './labels.js';
 import { diffCritters } from './diff.js';
 import {
@@ -96,7 +98,7 @@ export function createPen(el, opts = {}) {
       label: null, labelFor: '',
       cx: 0, cy: 0, cr: 0, flip: false, spin: 0,
       // ── islands / wander ──
-      wander: null, home: null, place: null, hop: null, landed: false,
+      wander: null, home: null, place: null, hop: null,
       // ── personality hooks ──
       mind: createMind(seed), gaze: { x: 0, y: 0 }, attn: null,
     };
@@ -183,7 +185,8 @@ export function createPen(el, opts = {}) {
   function relayout() {
     const live = [];
     for (const s of sprites.values()) if (s.life === 'enter' || s.life === 'live') live.push(s.data);
-    layout = computeLayout({ width: W, height: H, critters: live, anchors: layout?.anchors });
+    // Pass the previous layout: unless the pen was resized, everything placed stays pinned.
+    layout = computeLayout({ width: W, height: H, critters: live, prev: layout, footprint: isletFootprint });
     labelWidth = layout.labelWidth;
     for (const [id, slot] of layout.slots) {
       const s = sprites.get(id);
@@ -394,7 +397,7 @@ export function createPen(el, opts = {}) {
     }
     // Bell queue: needs-you critters, first come first served.
     for (const s of sprites.values()) {
-      const wants = layout?.mainland && s.status === 'needs-you' && (s.life === 'live' || s.life === 'enter');
+      const wants = layout?.islets && s.status === 'needs-you' && (s.life === 'live' || s.life === 'enter');
       const i = bellQueue.indexOf(s.id);
       if (wants && i < 0) bellQueue.push(s.id);
       else if (!wants && i >= 0) bellQueue.splice(i, 1);
@@ -427,16 +430,17 @@ export function createPen(el, opts = {}) {
     return null;
   }
 
-  /** Building captions and island name planks: places name labels must not cover. */
+  /** Service buildings, their caption planks and island name planks: places name labels must not cover. */
   function labelObstacles() {
-    if (!layout?.mainland) return [];
+    if (!layout?.islets) return [];
     const out = [];
-    ctx.font = '600 10px system-ui, -apple-system, Segoe UI, sans-serif';
-    for (const lm of layout.landmarks) {
-      const w = ctx.measureText(LANDMARK_LABELS[lm.kind]).width + 8;
-      out.push({ l: lm.x - w / 2, r: lm.x + w / 2, t: lm.baseY + 4, b: lm.baseY + 18 });
-    }
     ctx.font = '700 10px system-ui, -apple-system, Segoe UI, sans-serif';
+    for (const i of layout.islets) {
+      const bf = buildingFootprint(i.kind, i.scale), base = isletBase(i);
+      out.push({ l: base.x - bf.w / 2, r: base.x + bf.w / 2, t: base.y - bf.top, b: base.y });
+      const sc = clamp(i.scale, 0.8, 1.2), w = (ctx.measureText(LANDMARK_LABELS[i.kind]).width + 14) * sc;
+      out.push({ l: i.x - w / 2, r: i.x + w / 2, t: base.captionY, b: base.captionY + 17 * sc });
+    }
     const sc = clamp(layout.radius / 18, 0.8, 1.15);
     for (const v of islandViz.values()) {
       const w = Math.min(150, ctx.measureText(v.taskName || '').width + 14) * sc;
@@ -444,6 +448,21 @@ export function createPen(el, opts = {}) {
       out.push({ l: v.cx - w / 2, r: v.cx + w / 2, t: top, b: top + 17 * sc });
     }
     return out;
+  }
+
+  /** Where an islet's building stands this frame (bob included), and where its plank hangs. */
+  function isletBase(i) {
+    const cy = i.y + isletBob(i.kind, time, i.scale, reduced);
+    return { x: i.kind === 'human' ? i.x : i.x - i.fp.rx * 0.08, y: cy + i.fp.ry * 0.15, captionY: cy + i.fp.ry * 1.3 + 4 };
+  }
+
+  /** Spot n in the queue outside the "you" islet's building (riding its bob). */
+  function youSpot(n) {
+    const isl = layout.islets.find((i) => i.kind === 'human');
+    const base = isletBase(isl);
+    const slots = bellQueueSlots(isl.scale, layout.radius, Math.max(8, n + 1));
+    const q = slots[Math.min(n, slots.length - 1)];
+    return { x: base.x + q.dx, y: base.y + q.dy, side: q.side, base, scale: isl.scale, lookX: base.x, lookY: base.y - isl.fp.top * 0.5 };
   }
 
   /** Advance a hop along an arc toward (tx, ty); true once it has landed. */
@@ -489,10 +508,11 @@ export function createPen(el, opts = {}) {
           if (s.alpha <= 0) sprites.delete(s.id);
           continue;
         }
-        if (s.leaveAge > 1.1 && layout?.mainland && !s.landed) {
-          // ── islands / wander ── hop down to the mainland, then walk off.
-          s.hop ??= { from: { x: s.x.x, y: s.y.x }, to: { x: s.x.x, y: layout.mainland.y + layout.mainland.h * 0.78 }, age: 0, dur: 0.7 };
-          if (stepHop(s, dt, s.hop.to.x, s.hop.to.y)) s.landed = true;
+        if (s.leaveAge > 1.1 && layout?.islets) {
+          // ── islands / wander ── hop off the island and away off-screen.
+          s.hop ??= { from: { x: s.x.x, y: s.y.x }, to: { x: s.leaveDir < 0 ? -s.homeR * 4 : W + s.homeR * 4, y: s.y.x + 40 }, age: 0, dur: 1.1 };
+          s.alpha = 1 - clamp((s.hop.age / s.hop.dur - 0.7) / 0.3, 0, 1);
+          if (stepHop(s, dt, s.hop.to.x, s.hop.to.y)) sprites.delete(s.id);
           continue;
         }
         if (s.leaveAge > 1.1) {
@@ -518,11 +538,11 @@ export function createPen(el, opts = {}) {
         place = 'island';
       }
       const qi = bellQueue.indexOf(s.id);
-      const bell = qi >= 0 && layout.landmarks.find((l) => l.kind === 'human');
-      if (bell) {
-        const b = bellSlot(qi, bell, layout.radius);
-        tx = b.x; ty = b.y; place = 'bell';
-        s.lookAt = { x: bell.x, y: bell.y }; s.lookUntil = time + 0.2;
+      if (qi >= 0 && layout.islets) {
+        // Needs you: queue outside the "you" islet's building, looking at it.
+        const q = youSpot(qi);
+        tx = q.x; ty = q.y; place = 'bell';
+        s.lookAt = { x: q.lookX, y: q.lookY }; s.lookUntil = time + 0.2;
       }
       if (s.visit) {
         const v = s.visit;
@@ -530,7 +550,7 @@ export function createPen(el, opts = {}) {
         const lm = v.lm;
         const inward = lm.side === 'left' ? 1 : lm.side === 'right' ? -1 : 0;
         let vx = lm.x + inward * (lm.r + s.r.x * 1.3), vy = lm.y + (lm.side === 'top' ? lm.r + s.r.x * 2.4 : lm.side === 'bottom' ? -lm.r : lm.r * 0.6);
-        if (lm.baseY != null && lm.side === 'bottom') { vx = lm.x - (lm.r * 1.2 + s.r.x); vy = lm.baseY + s.r.x * 0.35; }
+        if (lm.kind === 'human' && layout.islets) { const q = youSpot(bellQueue.length); vx = q.x; vy = q.y; }
         place = 'visit';
         if (v.stage === 'go') {
           tx = vx; ty = vy;
@@ -542,11 +562,11 @@ export function createPen(el, opts = {}) {
         }
       }
       // ── islands / wander ── changing place (island ↔ bell) is a hop through the air.
-      if (s.place && place !== s.place && layout.mainland && !reduced && s.life === 'live') {
+      if (s.place && place !== s.place && layout.islets && !reduced && s.life === 'live') {
         s.hop = { from: { x: s.x.x, y: s.y.x }, age: 0, dur: clamp(Math.hypot(tx - s.x.x, ty - s.y.x) / 420, 0.55, 1.1) };
       }
       s.place = place;
-      if (reduced && layout.mainland && s.life === 'live') { s.hop = null; placeAt(s, tx, ty); }
+      if (reduced && layout.islets && s.life === 'live') { s.hop = null; placeAt(s, tx, ty); }
       else if (s.hop) stepHop(s, dt, tx, ty);
       else if (!s.enterFrom || s.enterFrom.landed) {
         springStep(s.x, tx, dt, 40, 2 * Math.sqrt(40) * 1.05);
@@ -839,13 +859,14 @@ export function createPen(el, opts = {}) {
     // ── personality hooks ── soft sky (gradient, clouds or stars) behind the scene.
     if (!layout.compact) drawSky(ctx, { W, H, pal, time, reduced, horizon: layout.mainland ? layout.mainland.y + 30 : H });
 
-    // ── islands / wander ── mainland, then islands back to front with signposts.
-    if (layout.mainland) {
-      drawMainland(ctx, layout.mainland, pal);
-      const isles = [...islandViz.values()].sort((a, b) => a.cy - b.cy);
-      for (const v of isles) {
-        drawIsland(ctx, v, pal, { bob: v.bob, alpha: v.a });
-      }
+    // ── islands / wander ── task islands and service islets, back to front.
+    const needsYou = [...sprites.values()].filter((s) => s.status === 'needs-you' && s.life !== 'leave').length;
+    if (layout.islets) {
+      const scene = [
+        ...[...islandViz.values()].map((v) => ({ y: v.cy, draw: () => drawIsland(ctx, v, pal, { bob: v.bob, alpha: v.a }) })),
+        ...layout.islets.map((i) => ({ y: i.y, draw: () => drawServiceIslet(i, needsYou) })),
+      ].sort((a, b) => a.y - b.y);
+      for (const it of scene) it.draw();
     }
 
     // Cluster patches + task labels (compact tray), eased toward their targets.
@@ -882,9 +903,8 @@ export function createPen(el, opts = {}) {
     // ── personality hooks ── fireflies / petals, behind everything that moves.
     drawAmbient(ctx, { W, H, pal, time, reduced, areas: layout.islands });
 
-    // Landmarks.
-    const needsYou = [...sprites.values()].filter((s) => s.status === 'needs-you' && s.life !== 'leave').length;
-    for (const lm of layout.landmarks) {
+    // Landmarks (the compact tray's strip; the full pen draws them as islets above).
+    for (const lm of layout.compact ? layout.landmarks : []) {
       const st = lmState.get(lm.kind);
       const pulse = reduced ? 0 : st.pulseAge < 0.55 ? Math.sin(Math.PI * st.pulseAge / 0.55) * (1 - st.pulseAge / 0.55 * 0.4) : 0;
       let glow = st.glowAge < 1.2 ? 1 - st.glowAge / 1.2 : 0;
@@ -924,7 +944,11 @@ export function createPen(el, opts = {}) {
     list.sort((a, b) => a.s.y.x - b.s.y.x);
     const hoverSprite = hovered ? sprites.get(hovered) : null;
     const labels = [];
+    // ── islands / wander ── the front of the phone queue holds the receiver, standing still.
+    const holderId = layout.islets && bellQueue[PHONE_HOLDER_SLOT];
     for (const { s, pose, r } of list) {
+      const holding = s.id === holderId && s.place === 'bell' && !s.hop && s.life === 'live';
+      if (holding) { pose.dy = 0; pose.lift = 0; pose.wave = null; pose.feetDrop = 0; }
       const color = currentColor(s);
       const groundY = s.y.x;
       drawShadow(ctx, s.x.x + pose.dx, groundY, r, pose.lift, pal, s.alpha);
@@ -940,6 +964,10 @@ export function createPen(el, opts = {}) {
         accessory: s.accessory, tint: s.tint, eyeInk: s.eyeInk,
         phase: s.phase, spin: s.spin, flip: s.flip,
       }, pal, time);
+      if (holding) {
+        const q = youSpot(PHONE_HOLDER_SLOT), sock = phoneSocket(q.scale), rs = receiverSpot(r, q.side);
+        drawPhoneReceiver(ctx, q.base.x + sock.dx * q.side, q.base.y + sock.dy, s.x.x + pose.dx + rs.dx, groundY + rs.dy, q.scale, pal, reduced ? 0 : time);
+      }
 
       // Status overlays (drawn upright, outside the squash).
       const headY = s.cy - r * 1.2;
@@ -980,7 +1008,7 @@ export function createPen(el, opts = {}) {
       }
       if (!layout.compact && hovered !== s.id) {
         const near = hoverSprite && Math.abs(hoverSprite.y.x - groundY) < 30 && Math.abs(hoverSprite.x.x - s.x.x) < labelWidth * 1.5;
-        labels.push({ id: s.id, text: s.label, short: s.labelShort, x: s.x.x, groundY, r, status: s.status, above: s.place === 'bell', parent: s.role === 'parent', font, body: { cx: s.cx, cy: s.cy, cr: s.cr }, headroom: headroomOf(s, r), alpha: (s.status === 'asleep' ? 0.6 : 0.85) * a * (near ? 0.2 : 1) });
+        labels.push({ id: s.id, text: s.label, short: s.labelShort, x: s.x.x, groundY, r, status: s.status, parent: s.role === 'parent', font, body: { cx: s.cx, cy: s.cy, cr: s.cr }, headroom: headroomOf(s, r), alpha: (s.status === 'asleep' ? 0.6 : 0.85) * a * (near ? 0.2 : 1) });
       }
     }
 
@@ -1048,7 +1076,8 @@ export function createPen(el, opts = {}) {
     }
 
     // ── islands / wander ── name planks over the debris, so a flurry of paper never hides them.
-    if (layout.mainland) {
+    if (layout.islets) {
+      for (const i of layout.islets) drawCaptionPlank(ctx, i.x, isletBase(i).captionY, LANDMARK_LABELS[i.kind], pal, i.scale, { kind: i.kind });
       for (const v of islandViz.values()) {
         drawSignpost(ctx, v.cx, v.cy + v.bob + v.ry * 1.3 + 4, v.taskName, pal, { scale: clamp(layout.radius / 18, 0.8, 1.15), alpha: v.a, hang: true });
       }
@@ -1104,6 +1133,14 @@ export function createPen(el, opts = {}) {
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(text, x, y + 0.5);
     }
+  }
+
+  /** One service islet: its carrier, then its building (hit animation, the "you" glow). */
+  function drawServiceIslet(i, needsYou) {
+    const st = lmState.get(i.kind);
+    const hit = reduced ? 0 : clamp(1 - st.pulseAge / 0.9, 0, 1);
+    const base = drawCarrier(ctx, 'islet', i.kind, i.x, i.y, i.scale, pal, time, { reduced });
+    drawServiceBuilding(ctx, i.kind, base.x, base.y, i.scale, pal, time, { hit, waiting: i.kind === 'human' && needsYou ? 1 : 0, reduced });
   }
 
   // ── loop, sizing, theme, input ─────────────────────────────────────────────
@@ -1180,6 +1217,7 @@ export function createPen(el, opts = {}) {
   };
   const onLeave = () => { hovered = null; pointer = null; canvas.style.cursor = ''; };
   const onClick = (ev) => {
+    if (!ev.isTrusted) return; // only a real human click may open a session
     const s = pick(ev);
     if (!s) return;
     s.throwAge = 0;
