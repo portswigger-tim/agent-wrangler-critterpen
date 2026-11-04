@@ -48,7 +48,7 @@ fit, everything shrinks a little. Sessions with no task get a small **rocky isle
 Critters **wander** their own island in island-local coordinates (`wander.js`), so a
 critter can never step off it: brisk strolls when working, slow ambles when thinking or
 idle, and staying put when finished, asleep or in error. **Personal space**
-(`PERSONAL_SPACE`, 2.5 radii between feet, with depth weighted at 0.75 so a hopping
+(`PERSONAL_SPACE`, 3 radii between feet, with depth weighted at 0.75 so a hopping
 front critter clears the one behind) keeps bodies apart while strolling and at rest:
 home spots are relaxed apart in the layout too, so reduced motion and the first frame
 are just as tidy.
@@ -62,14 +62,19 @@ hit target scales with size, so parents are the easiest to click. Islands are si
 the room their crowd needs (Σ scale²).
 
 **Name labels** (`labels.js`) drop a leading copy of the task name (matched loosely)
-and shorten long names from the middle by whole words, keeping the first and last
-(`util.truncateMiddle`; a single long word is cut inside). They are placed above
-everything in priority order
-(needs-you > finished > working > thinking > error > idle > asleep; parents first among
-equals, in bolder type; then front-most), each trying under the feet, a line lower,
-sideways or just over the head (clearing a hat or bubble, up to 22px), avoiding every
-critter's body, building captions and name planks; a label with no clear spot fades to
-a whisper. Name planks are drawn over flying debris.
+and shorten long names from the middle (`util.truncateMiddle`): whole middle words go
+first ("Investigate … timeouts"), then the first word is cut keeping at least 4 letters
+("Inves… timeouts"), then just the first word ("Investigate…"); never a stub of fewer
+than 4 letters, never a cut inside both end words, and nothing rather than a fragment.
+They are placed above everything in priority order (needs-you, then parents, then
+finished > working > thinking > error > idle > asleep, then front-most). **A name stays
+with its owner:** it may sit at one of two anchors, under the feet or just over the head
+(clearing a hat or bubble up to 22px), nudged at most about a body radius (at least one
+line) from it, trying the full name and then the short form (the first whole word,
+"Investigate…"). It must avoid every critter's body, building captions and name planks.
+With no clear spot nearby it is whispered at its default spot if that covers nothing,
+and hidden otherwise (hover shows the full name). Personal space of 3 radii keeps most
+names readable even in crowds.
 
 **Leashes** are a little rope (about 2.4px, earthy: light tan on dark themes, dark brown
 on light, over a contrasting halo) from parent to child, drawn above the islands and
