@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { ICON, parseActivity } from './index.js';
+import { ICON, parseActivity, penOptions } from './index.js';
 
 test('the rail icon is an svg with class="icon", which core sizes on the rail', () => {
   assert.match(ICON, /^<svg class="icon"[\s>]/);
@@ -19,4 +19,17 @@ test('parseActivity keeps known kinds and short labels only', () => {
     { critterId: 'a', kind: 'terminal' },
   ]);
   assert.deepEqual(parseActivity({ kind: 'other' }), []);
+});
+
+test('renderer options leave reducedMotion unset so the engine follows the media query live', () => {
+  const opts = penOptions({ openSession() {} });
+  assert.equal('reducedMotion' in opts, false);
+  assert.equal(opts.theme, 'auto');
+});
+
+test('clicking a critter opens that session on the board', () => {
+  const opened = [];
+  penOptions({ openSession: (id) => opened.push(id) }).onCritterClick('sess-1');
+  assert.deepEqual(opened, ['sess-1']);
+  assert.doesNotThrow(() => penOptions(undefined).onCritterClick('x'));
 });
