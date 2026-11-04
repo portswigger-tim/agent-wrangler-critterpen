@@ -29,6 +29,10 @@ export function hasFailingPr(links) {
 // is doing, and red comes back the moment it stops.
 export function statusFor(session, now = Date.now()) {
   if (session.status === 'needs-you') return 'needs-you';
+  // The board's own displayStatus shows idle + a background shell as JOB, in the
+  // same green as working (agent-wrangler public/util.js): the turn has ended but
+  // a command the session started is still running, so it is not asleep.
+  if (session.status === 'idle' && session.hasBackgroundShell) return 'working';
   if (session.status === 'working') {
     // 'shell' is Claude running a Bash tool: definitely not just thinking.
     if (session.rawStatus === 'shell' || session.hasBackgroundShell) return 'working';

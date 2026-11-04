@@ -30,8 +30,8 @@ cd ../agent-wrangler
 AW_DEV=1 AW_DATA_DIR=/tmp/aw-critters AW_PORT=7991 node server/index.js
 ```
 
-Open <http://localhost:7991>. **Critters** is on the rail (the badge counts sessions
-that need you), and the extension is listed under Settings → Extensions → Installed.
+Open <http://localhost:7991>. **Critters** is on the rail, and the extension is listed
+under Settings → Extensions → Installed.
 Dispatch a session or two on that board to see critters. Sessions on your main board
 don't show up there.
 
