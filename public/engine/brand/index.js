@@ -19,10 +19,14 @@ export const PLANK_MARKS = Object.freeze({ git: GIT_MARK });
  * @returns {string} variant name, e.g. 'black' | 'white'
  */
 export function markVariantFor(mark, background) {
-  let best = null, bestC = -1;
+  let best = null,
+    bestC = -1;
   for (const [name, v] of Object.entries(mark.variants)) {
     const c = contrast(parseColor(v.fill), background);
-    if (c > bestC) { best = name; bestC = c; }
+    if (c > bestC) {
+      best = name;
+      bestC = c;
+    }
   }
   return best;
 }
@@ -31,7 +35,10 @@ export function markVariantFor(mark, background) {
 export function transformSteps(svgTransform) {
   const steps = [];
   for (const m of svgTransform.matchAll(/(translate|rotate)\(([^)]*)\)/g)) {
-    const n = m[2].trim().split(/[\s,]+/).map(Number);
+    const n = m[2]
+      .trim()
+      .split(/[\s,]+/)
+      .map(Number);
     if (m[1] === 'translate') steps.push({ op: 'translate', x: n[0], y: n[1] || 0 });
     else steps.push({ op: 'rotate', deg: n[0], cx: n[1] || 0, cy: n[2] || 0 });
   }
@@ -50,7 +57,10 @@ export function drawMark(ctx, mark, x, y, size, variant) {
   const v = mark.variants[variant];
   if (!v) return false;
   let p = paths.get(mark);
-  if (!p) { p = new Path2D(mark.path); paths.set(mark, p); }
+  if (!p) {
+    p = new Path2D(mark.path);
+    paths.set(mark, p);
+  }
   const [vx, vy, vw, vh] = mark.viewBox.split(/\s+/).map(Number);
   const k = size / Math.max(vw, vh);
   ctx.save();
@@ -59,7 +69,11 @@ export function drawMark(ctx, mark, x, y, size, variant) {
   ctx.translate(-vx, -vy);
   for (const s of transformSteps(mark.transform)) {
     if (s.op === 'translate') ctx.translate(s.x, s.y);
-    else { ctx.translate(s.cx, s.cy); ctx.rotate((s.deg * Math.PI) / 180); ctx.translate(-s.cx, -s.cy); }
+    else {
+      ctx.translate(s.cx, s.cy);
+      ctx.rotate((s.deg * Math.PI) / 180);
+      ctx.translate(-s.cx, -s.cy);
+    }
   }
   ctx.fillStyle = v.fill;
   ctx.fill(p);

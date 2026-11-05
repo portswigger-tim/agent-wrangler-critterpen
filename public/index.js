@@ -19,14 +19,17 @@ const ACTIVITY_KINDS = new Set(['git', 'pr', 'jira', 'terminal', 'files', 'web']
 const MAX_LABEL = 40;
 
 // `class="icon"` is what sizes it on the rail (core's `#nav-rail .icon`); without it the button draws it smaller.
-export const ICON = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><circle cx="9.5" cy="12" r="1" fill="currentColor"/><circle cx="14.5" cy="12" r="1" fill="currentColor"/><path d="M8 4.5 10 6M16 4.5 14 6"/></svg>';
+export const ICON =
+  '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><circle cx="9.5" cy="12" r="1" fill="currentColor"/><circle cx="14.5" cy="12" r="1" fill="currentColor"/><path d="M8 4.5 10 6M16 4.5 14 6"/></svg>';
 
 // The engine's renderer and the statuses its contract can draw (an older engine
 // lacks the newer ones; see forEngine).
 let enginePromise = null;
 function loadEngine() {
   enginePromise ??= Promise.all([import('./engine/pen.js'), import('./engine/contract.js').catch(() => null)])
-    .then(([pen, contract]) => (typeof pen.createPen === 'function' ? { createPen: pen.createPen, statuses: contract?.STATUSES ?? null } : null))
+    .then(([pen, contract]) =>
+      typeof pen.createPen === 'function' ? { createPen: pen.createPen, statuses: contract?.STATUSES ?? null } : null,
+    )
     .catch(() => null);
   return enginePromise;
 }
@@ -39,7 +42,10 @@ function loadEngine() {
 export function penOptions(api, onSeen = () => {}) {
   return {
     theme: 'auto',
-    onCritterClick: (id) => { onSeen(id); api?.openSession?.(id); },
+    onCritterClick: (id) => {
+      onSeen(id);
+      api?.openSession?.(id);
+    },
   };
 }
 
@@ -55,9 +61,18 @@ export function finishedStorage(storage) {
 
 export function parseActivity(msg) {
   if (msg?.kind !== 'activity' || !Array.isArray(msg.events)) return [];
-  return msg.events.filter((e) => e && typeof e.sessionId === 'string' && e.sessionId && ACTIVITY_KINDS.has(e.kind)
-    && (e.label === undefined || (typeof e.label === 'string' && e.label.length <= MAX_LABEL)))
-    .map((e) => (e.label ? { critterId: e.sessionId, kind: e.kind, label: e.label } : { critterId: e.sessionId, kind: e.kind }));
+  return msg.events
+    .filter(
+      (e) =>
+        e &&
+        typeof e.sessionId === 'string' &&
+        e.sessionId &&
+        ACTIVITY_KINDS.has(e.kind) &&
+        (e.label === undefined || (typeof e.label === 'string' && e.label.length <= MAX_LABEL)),
+    )
+    .map((e) =>
+      e.label ? { critterId: e.sessionId, kind: e.kind, label: e.label } : { critterId: e.sessionId, kind: e.kind },
+    );
 }
 
 // Critter Pen never changes the human's view on its own. Nothing here (a
@@ -75,7 +90,9 @@ export function registerCritters(slots, { loadRenderer = loadEngine, createFallb
   const render = (st, graph) => {
     if (graph) st.graph = graph;
     if (!st.graph) return;
-    const { state, events } = st.adapter.tick(st.graph, Date.now(), { selectedId: st.api?.selectedSessionId?.() ?? null });
+    const { state, events } = st.adapter.tick(st.graph, Date.now(), {
+      selectedId: st.api?.selectedSessionId?.() ?? null,
+    });
     st.critters = new Set(state.critters.map((c) => c.id));
     st.pen.setState(forEngine(state, st.statuses));
     for (const ev of events) st.pen.emit(ev);
@@ -97,7 +114,16 @@ export function registerCritters(slots, { loadRenderer = loadEngine, createFallb
       el.classList.add('critter-pen');
       const adapter = createAdapter({ storage: finishedStorage(api?.storage) });
       const opts = penOptions(api, (id) => adapter.acknowledge(id));
-      const st = { pen: createFallbackPen(el, opts), adapter, api, statuses: null, graph: null, critters: new Set(), timer: null, observer: null };
+      const st = {
+        pen: createFallbackPen(el, opts),
+        adapter,
+        api,
+        statuses: null,
+        graph: null,
+        critters: new Set(),
+        timer: null,
+        observer: null,
+      };
       pens.set(el, st);
       st.timer = setInterval(() => render(st), RETICK_MS);
       if (typeof ResizeObserver === 'function') {
@@ -131,5 +157,7 @@ export function registerCritters(slots, { loadRenderer = loadEngine, createFallb
 }
 
 export default {
-  register(slots) { registerCritters(slots); },
+  register(slots) {
+    registerCritters(slots);
+  },
 };

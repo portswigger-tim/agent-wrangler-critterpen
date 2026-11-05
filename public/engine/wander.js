@@ -12,14 +12,18 @@ const MAX_WALK = 6;
 
 /** Uniform random point in the disk of radius maxR. */
 export function randomPoint(rand, maxR = WANDER_R) {
-  const a = rand() * TAU, d = Math.sqrt(rand()) * maxR;
+  const a = rand() * TAU,
+    d = Math.sqrt(rand()) * maxR;
   return { u: Math.cos(a) * d, v: Math.sin(a) * d };
 }
 
 /** Pull (u, v) back inside the disk of radius maxR. Mutates and returns p. */
 export function clampDisk(p, maxR = 1) {
   const d = Math.hypot(p.u, p.v);
-  if (d > maxR) { p.u *= maxR / d; p.v *= maxR / d; }
+  if (d > maxR) {
+    p.u *= maxR / d;
+    p.v *= maxR / d;
+  }
   return p;
 }
 
@@ -40,14 +44,22 @@ export function stepWander(w, dt, rand, { speed, pauseMin = 1.2, pauseMax = 4.5,
       // `around` keeps a stroll near a point: a parent near the middle, a child near its parent.
       const p = around ? randomPoint(rand, around.rad) : randomPoint(rand);
       const t = clampDisk({ u: (around ? around.u : 0) + p.u, v: (around ? around.v : 0) + p.v }, WANDER_R);
-      w.tu = t.u; w.tv = t.v; w.walk = 0;
+      w.tu = t.u;
+      w.tv = t.v;
+      w.walk = 0;
     }
     return w;
   }
   w.walk += dt;
-  const du = w.tu - w.u, dv = w.tv - w.v, d = Math.hypot(du, dv), step = speed * dt;
+  const du = w.tu - w.u,
+    dv = w.tv - w.v,
+    d = Math.hypot(du, dv),
+    step = speed * dt;
   if (d <= step || w.walk > MAX_WALK) {
-    if (d <= step) { w.u = w.tu; w.v = w.tv; }
+    if (d <= step) {
+      w.u = w.tu;
+      w.v = w.tv;
+    }
     w.wait = pauseMin + rand() * (pauseMax - pauseMin);
   } else {
     w.u += (du / d) * step;
@@ -71,18 +83,29 @@ export function stepWander(w, dt, rand, { speed, pauseMin = 1.2, pauseMax = 4.5,
 export function separate(list, minDist, ax, ay, strength = 0.5) {
   for (let i = 0; i < list.length; i++) {
     for (let j = i + 1; j < list.length; j++) {
-      const a = list[i], b = list[j];
-      let dx = (a.u - b.u) * ax, dy = (a.v - b.v) * ay;
+      const a = list[i],
+        b = list[j];
+      let dx = (a.u - b.u) * ax,
+        dy = (a.v - b.v) * ay;
       let d = Math.hypot(dx, dy);
       const need = a.rad && b.rad ? ((a.rad + b.rad) * PERSONAL_SPACE) / 2 : minDist;
       if (d >= need) continue;
-      if (d < 1e-6) { dx = i < j ? -1 : 1; dy = 0; d = 1; } // exactly stacked: split sideways
-      const ma = a.m ?? 1, mb = b.m ?? 1;
+      if (d < 1e-6) {
+        dx = i < j ? -1 : 1;
+        dy = 0;
+        d = 1;
+      } // exactly stacked: split sideways
+      const ma = a.m ?? 1,
+        mb = b.m ?? 1;
       const total = (need - d) * strength;
-      const pa = (total * ma) / (ma + mb), pb = (total * mb) / (ma + mb);
-      a.u += ((dx / d) * pa) / ax; a.v += ((dy / d) * pa) / ay;
-      b.u -= ((dx / d) * pb) / ax; b.v -= ((dy / d) * pb) / ay;
-      clampDisk(a, 1); clampDisk(b, 1);
+      const pa = (total * ma) / (ma + mb),
+        pb = (total * mb) / (ma + mb);
+      a.u += ((dx / d) * pa) / ax;
+      a.v += ((dy / d) * pa) / ay;
+      b.u -= ((dx / d) * pb) / ax;
+      b.v -= ((dy / d) * pb) / ay;
+      clampDisk(a, 1);
+      clampDisk(b, 1);
     }
   }
   return list;
@@ -108,7 +131,12 @@ export const DEPTH_WEIGHT = 0.75;
 
 /** Spread spots out until no two are closer than minDist world px (as far as the island allows). */
 export function relaxSpots(spots, ax, ay, minDist, iterations = 300) {
-  const list = spots.map((p) => ({ u: p.u, v: p.v, ...(p.rad ? { rad: p.rad } : {}), ...(p.m != null ? { m: p.m } : {}) }));
+  const list = spots.map((p) => ({
+    u: p.u,
+    v: p.v,
+    ...(p.rad ? { rad: p.rad } : {}),
+    ...(p.m != null ? { m: p.m } : {}),
+  }));
   for (let i = 0; i < iterations; i++) separate(list, minDist, ax, ay, 1);
   return list;
 }
@@ -116,9 +144,13 @@ export function relaxSpots(spots, ax, ay, minDist, iterations = 300) {
 /** Wander speed (disk units/s) and pauses per status; finished, asleep and error stay put. */
 export function wanderPace(status) {
   switch (status) {
-    case 'working': return { speed: 0.22, pauseMin: 0.8, pauseMax: 2.5 };
-    case 'thinking': return { speed: 0.1, pauseMin: 2.5, pauseMax: 6 };
-    case 'idle': return { speed: 0.06, pauseMin: 4, pauseMax: 9 };
-    default: return { speed: 0 };
+    case 'working':
+      return { speed: 0.22, pauseMin: 0.8, pauseMax: 2.5 };
+    case 'thinking':
+      return { speed: 0.1, pauseMin: 2.5, pauseMax: 6 };
+    case 'idle':
+      return { speed: 0.06, pauseMin: 4, pauseMax: 9 };
+    default:
+      return { speed: 0 };
   }
 }

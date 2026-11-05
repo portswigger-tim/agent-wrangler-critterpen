@@ -30,12 +30,23 @@ export function session(sessionId, over = {}) {
 export function graph(sessions, { tasks = [], assignments = {} } = {}) {
   return {
     sessions,
-    tasks: { tasks: tasks.map((t) => ({ links: [], ...t })), order: tasks.map((t) => t.id), assignments, sessionOrder: {} },
+    tasks: {
+      tasks: tasks.map((t) => ({ links: [], ...t })),
+      order: tasks.map((t) => t.id),
+      assignments,
+      sessionOrder: {},
+    },
     generatedAt: NOW,
   };
 }
 
-export const pr = (number, checkStatus = 'pending') => ({ type: 'pr', url: `https://github.com/o/r/pull/${number}`, repo: 'o/r', number, checkStatus });
+export const pr = (number, checkStatus = 'pending') => ({
+  type: 'pr',
+  url: `https://github.com/o/r/pull/${number}`,
+  repo: 'o/r',
+  number,
+  checkStatus,
+});
 export const jira = (key) => ({ type: 'jira', key, url: `https://example.atlassian.net/browse/${key}` });
 
 // The engine's contract validators when the engine is present beside the

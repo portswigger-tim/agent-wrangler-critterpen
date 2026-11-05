@@ -14,25 +14,112 @@
 }
 
 /* Placeholder renderer (public/placeholder-pen.js). */
-.cp-placeholder { padding: 16px; display: grid; gap: 12px; }
-.cp-note { margin: 0; color: var(--fg-muted); font-size: 0.9em; }
-.cp-groups { display: flex; flex-wrap: wrap; gap: 12px; }
-.cp-task { min-width: 220px; flex: 1 1 260px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }
-.cp-placeholder h3 { margin: 0 0 8px; font-size: 0.85em; font-weight: 600; color: var(--fg-muted); }
-.cp-task ul, .cp-log { list-style: none; margin: 0; padding: 0; }
-.cp-critter { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: center; padding: 4px; border-radius: 6px; }
-.cp-dot { grid-row: span 2; width: 14px; height: 14px; border-radius: 50%; background: var(--cp-idle); border: 1px solid var(--border); }
-.cp-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cp-meta { font-size: 0.8em; color: var(--fg-muted); }
-.cp-working .cp-dot { background: var(--cp-working); }
-.cp-thinking .cp-dot { background: var(--cp-thinking); }
-.cp-needs-you .cp-dot { background: var(--cp-needs-you); }
-.cp-error .cp-dot { background: var(--cp-error); }
-.cp-finished .cp-dot { background: var(--accent); }
-.cp-asleep { opacity: 0.7; }
-.cp-archived { opacity: 0.4; }
-.cp-hit { animation: cp-hit 0.8s ease-out; }
-@keyframes cp-hit { from { background: color-mix(in srgb, var(--accent) 35%, transparent); } to { background: transparent; } }
-.cp-log { font-family: var(--font-mono, monospace); font-size: 0.8em; max-height: 240px; overflow-y: auto; }
-.cp-log li { padding: 2px 0; white-space: pre; overflow: hidden; text-overflow: ellipsis; }
-@media (prefers-reduced-motion: reduce) { .cp-hit { animation: none; outline: 2px solid var(--accent); } }
+.cp-placeholder {
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+.cp-note {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 0.9em;
+}
+.cp-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.cp-task {
+  min-width: 220px;
+  flex: 1 1 260px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.cp-placeholder h3 {
+  margin: 0 0 8px;
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+.cp-task ul,
+.cp-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.cp-critter {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  align-items: center;
+  padding: 4px;
+  border-radius: 6px;
+}
+.cp-dot {
+  grid-row: span 2;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--cp-idle);
+  border: 1px solid var(--border);
+}
+.cp-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cp-meta {
+  font-size: 0.8em;
+  color: var(--fg-muted);
+}
+.cp-working .cp-dot {
+  background: var(--cp-working);
+}
+.cp-thinking .cp-dot {
+  background: var(--cp-thinking);
+}
+.cp-needs-you .cp-dot {
+  background: var(--cp-needs-you);
+}
+.cp-error .cp-dot {
+  background: var(--cp-error);
+}
+.cp-finished .cp-dot {
+  background: var(--accent);
+}
+.cp-asleep {
+  opacity: 0.7;
+}
+.cp-archived {
+  opacity: 0.4;
+}
+.cp-hit {
+  animation: cp-hit 0.8s ease-out;
+}
+@keyframes cp-hit {
+  from {
+    background: color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+  to {
+    background: transparent;
+  }
+}
+.cp-log {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8em;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.cp-log li {
+  padding: 2px 0;
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cp-hit {
+    animation: none;
+    outline: 2px solid var(--accent);
+  }
+}

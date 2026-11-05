@@ -48,14 +48,19 @@ export function watchableCards(sessions) {
   }
   const out = [];
   for (const [cwd, cards] of byCwd) {
-    if (cards.length === 1 && (cards[0].agent ?? 'claude') === 'claude') out.push({ sessionId: cards[0].sessionId, cwd });
+    if (cards.length === 1 && (cards[0].agent ?? 'claude') === 'claude')
+      out.push({ sessionId: cards[0].sessionId, cwd });
   }
   return out;
 }
 
 async function newestTranscript(dir) {
   let names;
-  try { names = await fs.readdir(dir); } catch { return null; }
+  try {
+    names = await fs.readdir(dir);
+  } catch {
+    return null;
+  }
   let best = null;
   for (const name of names) {
     if (!name.endsWith('.jsonl')) continue;
@@ -63,7 +68,9 @@ async function newestTranscript(dir) {
     try {
       const st = await fs.stat(file);
       if (st.isFile() && (!best || st.mtimeMs > best.mtimeMs)) best = { file, size: st.size, mtimeMs: st.mtimeMs };
-    } catch { /* vanished between readdir and stat */ }
+    } catch {
+      /* vanished between readdir and stat */
+    }
   }
   return best;
 }
@@ -88,7 +95,9 @@ async function startCwd(file) {
     try {
       const cwd = JSON.parse(line)?.cwd;
       if (typeof cwd === 'string' && cwd) return cwd;
-    } catch { /* partial last line, or not JSON */ }
+    } catch {
+      /* partial last line, or not JSON */
+    }
   }
   return undefined;
 }
@@ -99,7 +108,7 @@ export function createActivitySweep({ projectsDir = claudeProjectsDir(), realpat
 
   // New complete lines of one transcript since the last tick.
   async function newLines(file, size, sessionId, cwds) {
-    let t = tails.get(file);
+    const t = tails.get(file);
     if (!t || t.sessionId !== sessionId) {
       // The slug is lossy (a/b-c and a/b/c share a folder), so a transcript is
       // the card's only if it STARTED in the card's cwd. Later lines may carry
@@ -111,8 +120,16 @@ export function createActivitySweep({ projectsDir = claudeProjectsDir(), realpat
       return [];
     }
     if (t.foreign) return [];
-    if (size < t.offset) { t.offset = size; t.leftover = ''; return []; } // truncated/rewritten
-    if (size - t.offset > SKIP_AHEAD) { t.offset = size - READ_CAP; t.leftover = ''; t.skipPartial = true; }
+    if (size < t.offset) {
+      t.offset = size;
+      t.leftover = '';
+      return [];
+    } // truncated/rewritten
+    if (size - t.offset > SKIP_AHEAD) {
+      t.offset = size - READ_CAP;
+      t.leftover = '';
+      t.skipPartial = true;
+    }
     if (size === t.offset) return [];
     const chunk = await readRange(file, t.offset, Math.min(READ_CAP, size - t.offset));
     t.offset += chunk.length;
@@ -120,13 +137,20 @@ export function createActivitySweep({ projectsDir = claudeProjectsDir(), realpat
     t.leftover = lines.pop();
     if (t.leftover.length > MAX_LINE) t.leftover = '';
     // After a jump the first "line" is the tail of one we never saw the start of.
-    if (t.skipPartial) { lines.shift(); t.skipPartial = false; }
+    if (t.skipPartial) {
+      lines.shift();
+      t.skipPartial = false;
+    }
     return lines;
   }
 
   async function cardEvents(card) {
     const cwds = new Set([card.cwd]);
-    try { cwds.add(await realpath(card.cwd)); } catch { /* cwd gone: the plain path is all we have */ }
+    try {
+      cwds.add(await realpath(card.cwd));
+    } catch {
+      /* cwd gone: the plain path is all we have */
+    }
     let found = null;
     for (const cwd of cwds) {
       const t = await newestTranscript(path.join(projectsDir, cwdSlug(cwd)));
@@ -137,8 +161,17 @@ export function createActivitySweep({ projectsDir = claudeProjectsDir(), realpat
     for (const line of await newLines(found.file, found.size, card.sessionId, cwds)) {
       if (!line.trim()) continue;
       let entry;
-      try { entry = JSON.parse(line); } catch { continue; }
-      for (const c of classifyLine(entry)) events.push(c.label ? { sessionId: card.sessionId, kind: c.kind, label: c.label } : { sessionId: card.sessionId, kind: c.kind });
+      try {
+        entry = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      for (const c of classifyLine(entry))
+        events.push(
+          c.label
+            ? { sessionId: card.sessionId, kind: c.kind, label: c.label }
+            : { sessionId: card.sessionId, kind: c.kind },
+        );
     }
     return { file: found.file, events: events.slice(-MAX_EVENTS_PER_CARD) };
   }
@@ -156,7 +189,9 @@ export function createActivitySweep({ projectsDir = claudeProjectsDir(), realpat
             const r = await cardEvents(card);
             if (r.file) live.add(r.file);
             events.push(...r.events);
-          } catch { /* one unreadable transcript must not stop the others */ }
+          } catch {
+            /* one unreadable transcript must not stop the others */
+          }
         }
         for (const file of tails.keys()) if (!live.has(file)) tails.delete(file);
         if (events.length) host.broadcast({ kind: 'activity', events });
@@ -165,7 +200,11 @@ export function createActivitySweep({ projectsDir = claudeProjectsDir(), realpat
         running = false;
       }
     },
-    reset() { tails.clear(); },
-    get watching() { return tails.size; },
+    reset() {
+      tails.clear();
+    },
+    get watching() {
+      return tails.size;
+    },
   };
 }

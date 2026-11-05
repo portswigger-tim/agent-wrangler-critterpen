@@ -46,7 +46,8 @@ function linkChanges(prev, next) {
   for (const [url, pr] of next.prs) {
     const was = prev.prs.get(url);
     if (!was) out.push({ kind: 'pr', label: prLabel(pr) });
-    if (pr.checkStatus === 'failing' && was?.checkStatus !== 'failing') out.push({ kind: 'error', label: `${prLabel(pr)} checks failing` });
+    if (pr.checkStatus === 'failing' && was?.checkStatus !== 'failing')
+      out.push({ kind: 'error', label: `${prLabel(pr)} checks failing` });
   }
   for (const key of next.jiras) {
     if (!prev.jiras.has(key)) out.push({ kind: 'jira', label: key });
@@ -74,7 +75,8 @@ export function diffSnapshots(prev, next) {
     if (!was) {
       // A card that appears with a parent already on the pen was spawned (or
       // forked) by it. A parent that is not on the pen has nobody to fire from.
-      if (s.parentId && next.sessions.has(s.parentId)) events.push({ critterId: s.parentId, kind: 'spawn', label: s.name });
+      if (s.parentId && next.sessions.has(s.parentId))
+        events.push({ critterId: s.parentId, kind: 'spawn', label: s.name });
       continue;
     }
     // An 'unknown' blip carries the last known status forward (into `next`, so
@@ -83,7 +85,9 @@ export function diffSnapshots(prev, next) {
     if (s.status === 'unknown') s.status = was.status;
     for (const ch of linkChanges(was, s)) events.push({ critterId: id, ...ch });
     if (s.status === 'needs-you' && was.status !== 'needs-you') {
-      events.push(s.waitingFor ? { critterId: id, kind: 'human', label: String(s.waitingFor) } : { critterId: id, kind: 'human' });
+      events.push(
+        s.waitingFor ? { critterId: id, kind: 'human', label: String(s.waitingFor) } : { critterId: id, kind: 'human' },
+      );
     }
     // working → idle is core's "finished" transition. A needs-you → idle is the
     // human answering "no", not the agent finishing.

@@ -54,7 +54,9 @@ test('a new card whose parent is not on the pen spawns nothing', () => {
 });
 
 test('working → idle fires done; needs-you → idle does not', () => {
-  assert.deepEqual(diff(graph([session('a', { status: 'working' })]), graph([session('a')])), [{ critterId: 'a', kind: 'done' }]);
+  assert.deepEqual(diff(graph([session('a', { status: 'working' })]), graph([session('a')])), [
+    { critterId: 'a', kind: 'done' },
+  ]);
   assert.deepEqual(diff(graph([session('a', { status: 'needs-you' })]), graph([session('a')])), []);
 });
 
@@ -68,22 +70,26 @@ test('an unknown blip between working and idle is still a finish', () => {
 
 test('entering needs-you fires human with the reason', () => {
   const after = graph([session('a', { status: 'needs-you', waitingFor: 'Bash permission' })]);
-  assert.deepEqual(diff(graph([session('a', { status: 'working' })]), after), [{ critterId: 'a', kind: 'human', label: 'Bash permission' }]);
+  assert.deepEqual(diff(graph([session('a', { status: 'working' })]), after), [
+    { critterId: 'a', kind: 'human', label: 'Bash permission' },
+  ]);
   const noReason = graph([session('a', { status: 'needs-you' })]);
   assert.deepEqual(diff(graph([session('a')]), noReason), [{ critterId: 'a', kind: 'human' }]);
 });
 
-test('task-level links are pinned to the task\'s working member, else its most recent', () => {
+test("task-level links are pinned to the task's working member, else its most recent", () => {
   const tasks = (links) => ({ tasks: [{ id: 't', name: 'T', links }], assignments: { a: 't', b: 't', c: 't' } });
   const members = (statusB) => [
     session('a', { lastActivity: 100 }),
     session('b', { lastActivity: 50, status: statusB }),
     session('c', { lastActivity: 200 }),
   ];
-  assert.deepEqual(diff(graph(members('working'), tasks([])), graph(members('working'), tasks([jira('T-1')]))),
-    [{ critterId: 'b', kind: 'jira', label: 'T-1' }]);
-  assert.deepEqual(diff(graph(members('idle'), tasks([])), graph(members('idle'), tasks([pr(5)]))),
-    [{ critterId: 'c', kind: 'pr', label: '#5' }]);
+  assert.deepEqual(diff(graph(members('working'), tasks([])), graph(members('working'), tasks([jira('T-1')]))), [
+    { critterId: 'b', kind: 'jira', label: 'T-1' },
+  ]);
+  assert.deepEqual(diff(graph(members('idle'), tasks([])), graph(members('idle'), tasks([pr(5)]))), [
+    { critterId: 'c', kind: 'pr', label: '#5' },
+  ]);
 });
 
 test('a task link change with no member on the pen is dropped', () => {

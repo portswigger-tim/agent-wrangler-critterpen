@@ -8,28 +8,53 @@ function fakeDom({ reduce = false } = {}) {
   const mq = (query) => {
     const isReduce = query.includes('reduced-motion');
     return {
-      get matches() { return isReduce ? env.reduce : false; },
-      addEventListener: (_t, fn) => { if (isReduce) listeners.reduce.add(fn); },
+      get matches() {
+        return isReduce ? env.reduce : false;
+      },
+      addEventListener: (_t, fn) => {
+        if (isReduce) listeners.reduce.add(fn);
+      },
       removeEventListener: (_t, fn) => listeners.reduce.delete(fn),
     };
   };
   let log = [];
-  const record = (name) => (...args) => { log.push(name + '(' + args.map((a) => (typeof a === 'number' ? a.toFixed(2) : '')).join(',') + ')'); };
+  const record =
+    (name) =>
+    (...args) => {
+      log.push(`${name}(${args.map((a) => (typeof a === 'number' ? a.toFixed(2) : '')).join(',')})`);
+    };
   const gradient = { addColorStop() {} };
-  const ctx = new Proxy({}, {
-    get(target, k) {
-      if (k in target) return target[k];
-      if (k === 'createRadialGradient' || k === 'createLinearGradient') return () => gradient;
-      if (k === 'measureText') return (s) => ({ width: String(s).length * 6 });
-      if (k === 'getImageData') return () => ({ data: [0, 0, 0, 255] });
-      return record(String(k));
+  const ctx = new Proxy(
+    {},
+    {
+      get(target, k) {
+        if (k in target) return target[k];
+        if (k === 'createRadialGradient' || k === 'createLinearGradient') return () => gradient;
+        if (k === 'measureText') return (s) => ({ width: String(s).length * 6 });
+        if (k === 'getImageData') return () => ({ data: [0, 0, 0, 255] });
+        return record(String(k));
+      },
+      set(target, k, v) {
+        target[k] = v;
+        return true;
+      },
     },
-    set(target, k, v) { target[k] = v; return true; },
-  });
+  );
   const node = (tag) => ({
-    tagName: tag, style: {}, nodeType: 1, parentElement: null, children: [],
-    setAttribute() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent() {},
-    appendChild(c) { c.parentElement = this; this.children.push(c); return c; },
+    tagName: tag,
+    style: {},
+    nodeType: 1,
+    parentElement: null,
+    children: [],
+    setAttribute() {},
+    addEventListener() {},
+    removeEventListener() {},
+    dispatchEvent() {},
+    appendChild(c) {
+      c.parentElement = this;
+      this.children.push(c);
+      return c;
+    },
     remove() {},
     getBoundingClientRect: () => ({ left: 0, top: 0, width: 900, height: 600 }),
     getContext: () => ctx,
@@ -37,18 +62,26 @@ function fakeDom({ reduce = false } = {}) {
   let rafQueue = [];
   const env = {
     reduce,
-    get log() { return log; },
-    clearLog() { log = []; },
+    get log() {
+      return log;
+    },
+    clearLog() {
+      log = [];
+    },
     pendingFrames: () => rafQueue.length,
     /** Run frames covering `seconds` at 60fps. */
     step(seconds) {
       for (let i = 0; i < Math.round(seconds * 60); i++) {
-        const q = rafQueue; rafQueue = [];
+        const q = rafQueue;
+        rafQueue = [];
         env.now += 1000 / 60;
         q.forEach((fn) => fn(env.now));
       }
     },
-    setReduce(v) { env.reduce = v; listeners.reduce.forEach((fn) => fn({ matches: v })); },
+    setReduce(v) {
+      env.reduce = v;
+      listeners.reduce.forEach((fn) => fn({ matches: v }));
+    },
     now: 1000,
   };
   Object.assign(globalThis, {
@@ -56,16 +89,26 @@ function fakeDom({ reduce = false } = {}) {
     window: { devicePixelRatio: 1, addEventListener() {}, removeEventListener() {} },
     matchMedia: mq,
     getComputedStyle: () => ({ getPropertyValue: () => '' }),
-    requestAnimationFrame: (fn) => { rafQueue.push(fn); return rafQueue.length; },
-    cancelAnimationFrame: () => { rafQueue = []; },
-    MutationObserver: class { observe() {} disconnect() {} },
+    requestAnimationFrame: (fn) => {
+      rafQueue.push(fn);
+      return rafQueue.length;
+    },
+    cancelAnimationFrame: () => {
+      rafQueue = [];
+    },
+    MutationObserver: class {
+      observe() {}
+      disconnect() {}
+    },
     ResizeObserver: undefined,
     CustomEvent: class {},
   });
   return { env, el: node('div') };
 }
 
-const STATE = { critters: [{ id: 'hopper', name: 'Hopper', taskId: 't', taskName: 'T', agent: 'claude', status: 'working' }] };
+const STATE = {
+  critters: [{ id: 'hopper', name: 'Hopper', taskId: 't', taskName: 'T', agent: 'claude', status: 'working' }],
+};
 
 /** Draw calls of the next frame (one 1/60s step). */
 function frame(env) {

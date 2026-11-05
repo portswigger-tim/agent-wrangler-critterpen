@@ -44,22 +44,37 @@ test('network programs are web; other programs are terminal, named only when all
 test('file-changing and web tools map to their landmark; read-only tools fire nothing', () => {
   assert.deepEqual(classifyToolUse('Edit', { file_path: '/secret/path.env' }), { kind: 'files', label: 'Edit' });
   assert.deepEqual(classifyToolUse('Write', { file_path: '/x' }), { kind: 'files', label: 'Write' });
-  assert.deepEqual(classifyToolUse('WebFetch', { url: 'https://internal.example.com/?token=abc' }), { kind: 'web', label: 'WebFetch' });
+  assert.deepEqual(classifyToolUse('WebFetch', { url: 'https://internal.example.com/?token=abc' }), {
+    kind: 'web',
+    label: 'WebFetch',
+  });
   for (const t of ['Read', 'Grep', 'Glob', 'TodoWrite', 'mcp__agent-wrangler__list_sessions', undefined]) {
     assert.equal(classifyToolUse(t, {}), null, String(t));
   }
 });
 
 test('Jira MCP tools are jira, labelled with a strictly-shaped key only', () => {
-  assert.deepEqual(classifyToolUse('mcp__claude_ai_Atlassian__getJiraIssue', { issueIdOrKey: 'PROJ-123' }), { kind: 'jira', label: 'PROJ-123' });
-  assert.deepEqual(classifyToolUse('mcp__claude_ai_Atlassian__getJiraIssue', { issueIdOrKey: 'proj-123; rm -rf' }), { kind: 'jira', label: 'Jira' });
-  assert.deepEqual(classifyToolUse('mcp__jira__searchJiraIssuesUsingJql', { jql: 'project = X' }), { kind: 'jira', label: 'Jira' });
+  assert.deepEqual(classifyToolUse('mcp__claude_ai_Atlassian__getJiraIssue', { issueIdOrKey: 'PROJ-123' }), {
+    kind: 'jira',
+    label: 'PROJ-123',
+  });
+  assert.deepEqual(classifyToolUse('mcp__claude_ai_Atlassian__getJiraIssue', { issueIdOrKey: 'proj-123; rm -rf' }), {
+    kind: 'jira',
+    label: 'Jira',
+  });
+  assert.deepEqual(classifyToolUse('mcp__jira__searchJiraIssuesUsingJql', { jql: 'project = X' }), {
+    kind: 'jira',
+    label: 'Jira',
+  });
   assert.equal(classifyToolUse('mcp__claude_ai_Atlassian__getConfluencePage', { pageId: '1' }), null);
 });
 
 test('classifyLine reads every tool_use of an assistant line and ignores the rest', () => {
   assert.deepEqual(classifyLine(line('Bash', { command: 'git status' })), [{ kind: 'git', label: 'git status' }]);
-  assert.deepEqual(classifyLine({ type: 'user', message: { content: [{ type: 'tool_result', content: 'git push' }] } }), []);
+  assert.deepEqual(
+    classifyLine({ type: 'user', message: { content: [{ type: 'tool_result', content: 'git push' }] } }),
+    [],
+  );
   assert.deepEqual(classifyLine({ type: 'assistant', message: { content: 'plain text' } }), []);
   assert.deepEqual(classifyLine(null), []);
 });

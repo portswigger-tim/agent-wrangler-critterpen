@@ -22,8 +22,10 @@ export const BEHAVIOURS = {
 export const AMBIENT_KINDS = Object.keys(BEHAVIOURS).filter((k) => !BEHAVIOURS[k].triggered);
 
 /** Quiet time between ambient behaviours, and before the first one (seconds). */
-export const GAP_MIN = 8, GAP_MAX = 26;
-export const FIRST_MIN = 2, FIRST_MAX = 16;
+export const GAP_MIN = 8,
+  GAP_MAX = 26;
+export const FIRST_MIN = 2,
+  FIRST_MAX = 16;
 const EASE = 0.3; // seconds to ease into / out of a behaviour
 
 /**
@@ -53,12 +55,20 @@ export function* schedule(seed) {
  */
 export function createMind(seed) {
   let gen = schedule(seed);
-  let cur = gen.next().value, next = gen.next().value;
+  let cur = gen.next().value,
+    next = gen.next().value;
   let triggered = null;
 
   function ambientAt(t) {
-    if (t < cur.start) { gen = schedule(seed); cur = gen.next().value; next = gen.next().value; } // time went back
-    while (t >= next.start) { cur = next; next = gen.next().value; }
+    if (t < cur.start) {
+      gen = schedule(seed);
+      cur = gen.next().value;
+      next = gen.next().value;
+    } // time went back
+    while (t >= next.start) {
+      cur = next;
+      next = gen.next().value;
+    }
     return t >= cur.start && t < cur.start + cur.dur ? cur : null;
   }
 
@@ -69,7 +79,7 @@ export function createMind(seed) {
      */
     trigger(kind, t, { delay = 0, targetId = null } = {}) {
       const def = BEHAVIOURS[kind];
-      if (!def || !def.triggered) return;
+      if (!def?.triggered) return;
       triggered = { kind, start: t + delay, dur: def.dur, pick: (seed % 997) / 997, target: targetId };
     },
     /**
@@ -79,7 +89,10 @@ export function createMind(seed) {
      * @returns {null | { kind: string, age: number, dur: number, k: number, target: string|null, pick: number }}
      */
     at(t, ctx = {}) {
-      if (ctx.reduced) { triggered = null; return null; }
+      if (ctx.reduced) {
+        triggered = null;
+        return null;
+      }
       if (triggered && t >= triggered.start) {
         if (t < triggered.start + triggered.dur) return describe(triggered, t, triggered.target);
         triggered = null;
@@ -104,7 +117,10 @@ function describe(ev, t, target) {
   return { kind: ev.kind, age, dur: ev.dur, k: age / ev.dur, target, pick: ev.pick };
 }
 
-const smooth = (x) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+const smooth = (x) => {
+  x = clamp(x, 0, 1);
+  return x * x * (3 - 2 * x);
+};
 
 /** 0→1→0 envelope that eases in and out over EASE seconds. */
 export function envelope(b) {
@@ -119,7 +135,10 @@ export function envelope(b) {
  * @param {{x:number, y:number}|null} dir unit vector toward the target critter
  */
 export function behaviourPose(b, r, dir = null) {
-  const e = envelope(b), on = e > 0.5, a = b.age, k = b.k;
+  const e = envelope(b),
+    on = e > 0.5,
+    a = b.age,
+    k = b.k;
   const m = { w: e };
   switch (b.kind) {
     case 'yawn': {
@@ -129,7 +148,12 @@ export function behaviourPose(b, r, dir = null) {
       m.sx = 1 - 0.04 * open * e;
       m.rot = -0.06 * open;
       m.dy = -open * r * 0.05;
-      if (on) { m.mouth = open > 0.15 ? 'yawn' : 'small-o'; m.mouthOpen = open; m.lidTop = lerp(0.55, 1, open); m.lidBot = 0.25 * open; }
+      if (on) {
+        m.mouth = open > 0.15 ? 'yawn' : 'small-o';
+        m.mouthOpen = open;
+        m.lidTop = lerp(0.55, 1, open);
+        m.lidBot = 0.25 * open;
+      }
       break;
     }
     case 'stretch': {
@@ -138,45 +162,84 @@ export function behaviourPose(b, r, dir = null) {
       m.sx = 1 - 0.07 * up;
       m.dy = -up * r * 0.08;
       m.rot = Math.sin(a * 3.2) * 0.05 * up;
-      if (on) { m.eyes = 'happy'; m.mouth = 'o'; m.arms = 0.25 - 0.15 * up; m.armsUp = up; }
+      if (on) {
+        m.eyes = 'happy';
+        m.mouth = 'o';
+        m.arms = 0.25 - 0.15 * up;
+        m.armsUp = up;
+      }
       break;
     }
     case 'lookAround': {
       // Left, hold, right, hold, back to centre.
-      const gx = k < 0.35 ? -smooth(k / 0.15) : k < 0.75 ? lerp(-1, 1, smooth((k - 0.35) / 0.15)) : lerp(1, 0, smooth((k - 0.75) / 0.2));
-      m.lookX = gx * 0.95; m.lookY = -0.15;
+      const gx =
+        k < 0.35
+          ? -smooth(k / 0.15)
+          : k < 0.75
+            ? lerp(-1, 1, smooth((k - 0.35) / 0.15))
+            : lerp(1, 0, smooth((k - 0.75) / 0.2));
+      m.lookX = gx * 0.95;
+      m.lookY = -0.15;
       m.dx = gx * r * 0.04 * e;
-      if (on) { m.lidTop = 0; m.wake = true; }
+      if (on) {
+        m.lidTop = 0;
+        m.wake = true;
+      }
       break;
     }
     case 'chat': {
       const talk = Math.sin(a * 13) > 0;
-      if (dir) { m.lookX = dir.x; m.lookY = clamp(dir.y, -0.5, 0.5); m.rot = dir.x * 0.08 * e; }
+      if (dir) {
+        m.lookX = dir.x;
+        m.lookY = clamp(dir.y, -0.5, 0.5);
+        m.rot = dir.x * 0.08 * e;
+      }
       m.dy = -Math.abs(Math.sin(a * 6.5)) * r * 0.05 * e;
       if (on) {
-        m.mouth = talk ? 'o' : 'smile'; m.lidTop = 0; m.wake = true;
-        if (k > 0.12 && k < 0.88) m.bubble = { kind: b.pick < 0.35 ? 'heart' : 'dots', k: (k - 0.12) / 0.76, side: dir && dir.x < 0 ? -1 : 1 };
+        m.mouth = talk ? 'o' : 'smile';
+        m.lidTop = 0;
+        m.wake = true;
+        if (k > 0.12 && k < 0.88)
+          m.bubble = { kind: b.pick < 0.35 ? 'heart' : 'dots', k: (k - 0.12) / 0.76, side: dir && dir.x < 0 ? -1 : 1 };
       }
       break;
     }
     case 'glance': {
       const look = smooth(k / 0.15) * smooth((0.85 - k) / 0.15);
-      if (dir) { m.lookX = dir.x * look; m.lookY = clamp(dir.y, -0.5, 0.5) * look; }
+      if (dir) {
+        m.lookX = dir.x * look;
+        m.lookY = clamp(dir.y, -0.5, 0.5) * look;
+      }
       m.w = look;
-      if (on) { m.lidTop = 0; m.wake = true; }
+      if (on) {
+        m.lidTop = 0;
+        m.wake = true;
+      }
       break;
     }
     case 'hum': {
       m.rot = Math.sin(a * 3.4) * 0.09 * e;
       m.dx = Math.sin(a * 3.4) * r * 0.05 * e;
-      if (on) { m.eyes = 'happy'; m.mouth = 'small-o'; m.bubble = { kind: 'note', k, side: Math.sin(a * 3.4) < 0 ? -1 : 1 }; }
+      if (on) {
+        m.eyes = 'happy';
+        m.mouth = 'small-o';
+        m.bubble = { kind: 'note', k, side: Math.sin(a * 3.4) < 0 ? -1 : 1 };
+      }
       break;
     }
     case 'wave': {
-      const hop = a < 0.4 ? Math.sin(Math.PI * a / 0.4) : 0;
+      const hop = a < 0.4 ? Math.sin((Math.PI * a) / 0.4) : 0;
       m.dy = -hop * r * 0.25;
-      if (dir) { m.lookX = dir.x; m.lookY = clamp(dir.y, -0.5, 0.5); }
-      if (on) { m.eyes = 'happy'; m.mouth = 'grin'; m.wave = -0.5 + Math.sin(a * 11) * 0.65; m.wake = true; }
+      if (dir) {
+        m.lookX = dir.x;
+        m.lookY = clamp(dir.y, -0.5, 0.5);
+      }
+      if (on) {
+        m.eyes = 'happy';
+        m.mouth = 'grin';
+        m.wave = -0.5 + Math.sin(a * 11) * 0.65;
+        m.wake = true;
+      }
       break;
     }
     case 'wiggle': {
@@ -184,7 +247,12 @@ export function behaviourPose(b, r, dir = null) {
       m.rot = s * 0.16 * e;
       m.sx = 1 + s * 0.06 * e;
       m.sy = 1 - s * 0.06 * e;
-      if (on) { m.eyes = 'happy'; m.mouth = 'grin'; m.bubble = { kind: 'heart', k, side: 1 }; m.wake = true; }
+      if (on) {
+        m.eyes = 'happy';
+        m.mouth = 'grin';
+        m.bubble = { kind: 'heart', k, side: 1 };
+        m.wake = true;
+      }
       break;
     }
   }
@@ -221,7 +289,8 @@ export function applyBehaviour(pose, b, r, dir = null) {
 /** Fraction of [t0, t1) a mind spends in ambient behaviours (for tuning and tests). */
 export function busyFraction(seed, t0, t1, ctx = {}, step = 0.1) {
   const mind = createMind(seed);
-  let busy = 0, n = 0;
+  let busy = 0,
+    n = 0;
   for (let t = t0; t < t1; t += step, n++) if (mind.at(t, ctx)) busy++;
   return n ? busy / n : 0;
 }

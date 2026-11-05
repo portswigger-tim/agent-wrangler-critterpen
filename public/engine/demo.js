@@ -17,18 +17,72 @@ const TASKS = {
 let critters = [
   { id: 's-cart', name: 'Refactor cart service', taskId: 't1', taskName: TASKS.t1, agent: 'claude', status: 'working' },
   { id: 's-pay', name: 'Fix flaky payment tests', taskId: 't1', taskName: TASKS.t1, agent: 'codex', status: 'error' },
-  { id: 's-ci', name: 'Investigate CI timeouts', taskId: 't1', taskName: TASKS.t1, agent: 'claude', status: 'thinking', parentId: 's-cart' },
+  {
+    id: 's-ci',
+    name: 'Investigate CI timeouts',
+    taskId: 't1',
+    taskName: TASKS.t1,
+    agent: 'claude',
+    status: 'thinking',
+    parentId: 's-cart',
+  },
   { id: 's-api', name: 'Write API reference', taskId: 't2', taskName: TASKS.t2, agent: 'claude', status: 'needs-you' },
   { id: 's-astro', name: 'Migrate docs to Astro', taskId: 't2', taskName: TASKS.t2, agent: 'codex', status: 'working' },
   { id: 's-links', name: 'Fix broken links', taskId: 't2', taskName: TASKS.t2, agent: 'claude', status: 'asleep' },
   { id: 's-search', name: 'Add search box', taskId: 't2', taskName: TASKS.t2, agent: 'codex', status: 'finished' },
   { id: 's-pm', name: 'Critter Pen PM', taskId: 't3', taskName: TASKS.t3, agent: 'claude', status: 'thinking' },
-  { id: 's-engine', name: 'Build animation engine', taskId: 't3', taskName: TASKS.t3, agent: 'claude', status: 'working', parentId: 's-pm' },
-  { id: 's-adapter', name: 'Wrangler adapter', taskId: 't3', taskName: TASKS.t3, agent: 'gemini', status: 'working', parentId: 's-pm' },
-  { id: 's-art', name: 'Critter cuteness pass', taskId: 't3', taskName: TASKS.t3, agent: 'claude', status: 'thinking', parentId: 's-pm' },
-  { id: 's-readme', name: 'Rewrite the README', taskId: 't3', taskName: TASKS.t3, agent: 'codex', status: 'finished', parentId: 's-pm' },
-  { id: 's-sudo', name: 'Safer-runner-action Ubuntu 26.04 sudo-rs fix', taskId: 't4', taskName: TASKS.t4, agent: 'claude', status: 'working' },
-  { id: 's-mitm', name: 'Safer-runner-action L7 mitmproxy', taskId: 't4', taskName: TASKS.t4, agent: 'claude', status: 'idle' },
+  {
+    id: 's-engine',
+    name: 'Build animation engine',
+    taskId: 't3',
+    taskName: TASKS.t3,
+    agent: 'claude',
+    status: 'working',
+    parentId: 's-pm',
+  },
+  {
+    id: 's-adapter',
+    name: 'Wrangler adapter',
+    taskId: 't3',
+    taskName: TASKS.t3,
+    agent: 'gemini',
+    status: 'working',
+    parentId: 's-pm',
+  },
+  {
+    id: 's-art',
+    name: 'Critter cuteness pass',
+    taskId: 't3',
+    taskName: TASKS.t3,
+    agent: 'claude',
+    status: 'thinking',
+    parentId: 's-pm',
+  },
+  {
+    id: 's-readme',
+    name: 'Rewrite the README',
+    taskId: 't3',
+    taskName: TASKS.t3,
+    agent: 'codex',
+    status: 'finished',
+    parentId: 's-pm',
+  },
+  {
+    id: 's-sudo',
+    name: 'Safer-runner-action Ubuntu 26.04 sudo-rs fix',
+    taskId: 't4',
+    taskName: TASKS.t4,
+    agent: 'claude',
+    status: 'working',
+  },
+  {
+    id: 's-mitm',
+    name: 'Safer-runner-action L7 mitmproxy',
+    taskId: 't4',
+    taskName: TASKS.t4,
+    agent: 'claude',
+    status: 'idle',
+  },
 ];
 
 const LABELS = {
@@ -43,30 +97,80 @@ const LABELS = {
   done: ['shipped!', 'all green', 'done ✓'],
   error: ['tests failed', 'exit 1', 'timeout'],
 };
-const NAMES = ['Tidy logging', 'Bump deps', 'Write e2e tests', 'Profile hot path', 'Port to ESM', 'Add dark mode', 'Triage bugs', 'Explore cache bug'];
+const NAMES = [
+  'Tidy logging',
+  'Bump deps',
+  'Write e2e tests',
+  'Profile hot path',
+  'Port to ESM',
+  'Add dark mode',
+  'Triage bugs',
+  'Explore cache bug',
+];
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
 let selected = 's-engine';
 const pens = [];
 const state = () => ({ critters: critters.map((c) => ({ ...c })) });
-const push = () => { const s = state(); pens.forEach((p) => p.setState(s)); renderWho(); };
-const emit = (ev) => { pens.forEach((p) => p.emit(ev)); log(ev); };
+const push = () => {
+  const s = state();
+  pens.forEach((p) => p.setState(s));
+  renderWho();
+};
+const emit = (ev) => {
+  pens.forEach((p) => p.emit(ev));
+  log(ev);
+};
 
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-pens.push(createPen($('#pen'), { onCritterClick: (id) => { selected = id; renderWho(); } }));
-pens.push(createPen($('#tray'), { onCritterClick: (id) => { selected = id; renderWho(); } }));
+pens.push(
+  createPen($('#pen'), {
+    onCritterClick: (id) => {
+      selected = id;
+      renderWho();
+    },
+  }),
+);
+pens.push(
+  createPen($('#tray'), {
+    onCritterClick: (id) => {
+      selected = id;
+      renderWho();
+    },
+  }),
+);
 window.pens = pens; // handy for poking from the console
 push();
 
 // ── panel ────────────────────────────────────────────────────────────────────
-const STATUS_TOKEN = { working: '--green', thinking: '--blue', 'needs-you': '--yellow', error: '--red', finished: '--green', idle: '--surface-2', asleep: '--surface-2', archived: '--surface-2' };
+const STATUS_TOKEN = {
+  working: '--green',
+  thinking: '--blue',
+  'needs-you': '--yellow',
+  error: '--red',
+  finished: '--green',
+  idle: '--surface-2',
+  asleep: '--surface-2',
+  archived: '--surface-2',
+};
 for (const s of STATUSES) {
   const b = document.createElement('button');
   b.innerHTML = `<span class="swatch" style="background:var(${STATUS_TOKEN[s]})"></span>${s}`;
   b.onclick = () => setStatus(selected, s);
   $('#statuses').append(b);
 }
-const ICON = { git: '⑂', pr: '✈', jira: '🎫', terminal: '>_', files: '📁', web: '🎈', human: '🔔', spawn: '🐣', done: '🎉', error: '💥' };
+const ICON = {
+  git: '⑂',
+  pr: '✈',
+  jira: '🎫',
+  terminal: '>_',
+  files: '📁',
+  web: '🎈',
+  human: '🔔',
+  spawn: '🐣',
+  done: '🎉',
+  error: '💥',
+};
 for (const k of EVENT_KINDS) {
   const b = document.createElement('button');
   b.textContent = `${ICON[k] || ''} ${k}`;
@@ -76,7 +180,10 @@ for (const k of EVENT_KINDS) {
 
 function renderWho() {
   const c = critters.find((x) => x.id === selected) || critters.find((x) => x.status !== 'archived');
-  if (!c) { $('#who').textContent = '—'; return; }
+  if (!c) {
+    $('#who').textContent = '—';
+    return;
+  }
   selected = c.id;
   $('#who').innerHTML = '';
   $('#who').append(c.name);
@@ -99,7 +206,11 @@ function log(ev) {
 function setStatus(id, status) {
   critters = critters.map((c) => (c.id === id ? { ...c, status } : c));
   push();
-  if (status === 'archived') setTimeout(() => { critters = critters.filter((c) => c.id !== id); push(); }, 4000);
+  if (status === 'archived')
+    setTimeout(() => {
+      critters = critters.filter((c) => c.id !== id);
+      push();
+    }, 4000);
 }
 
 let nextId = 1;
@@ -108,8 +219,12 @@ function addCritter(parent) {
   if (live.length >= 18) return null;
   const taskId = parent ? parent.taskId : pick(Object.keys(TASKS));
   const c = {
-    id: `s-new-${nextId++}`, name: pick(NAMES), taskId, taskName: TASKS[taskId],
-    agent: pick(['claude', 'claude', 'codex']), status: 'working',
+    id: `s-new-${nextId++}`,
+    name: pick(NAMES),
+    taskId,
+    taskName: TASKS[taskId],
+    agent: pick(['claude', 'claude', 'codex']),
+    status: 'working',
     ...(parent ? { parentId: parent.id } : {}),
   };
   critters = [...critters, c];
@@ -121,12 +236,18 @@ function fire(id, kind) {
   if (!c) return;
   const label = Math.random() < 0.8 ? pick(LABELS[kind]) : undefined;
   emit({ critterId: id, kind, label });
-  if (kind === 'spawn') setTimeout(() => { if (addCritter(c)) push(); }, 650);
+  if (kind === 'spawn')
+    setTimeout(() => {
+      if (addCritter(c)) push();
+    }, 650);
   if (kind === 'done') setTimeout(() => setStatus(id, 'finished'), 900);
   if (kind === 'human') setStatus(id, 'needs-you');
 }
 
-$('#add').onclick = () => { addCritter(); push(); };
+$('#add').onclick = () => {
+  addCritter();
+  push();
+};
 $('#theme').onclick = () => {
   const root = document.documentElement;
   root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
@@ -186,7 +307,9 @@ function tickStatus() {
       const parent = pick(critters.filter((x) => x.status === 'working'));
       if (parent) fire(parent.id, 'spawn');
     } else if (r < 0.2) {
-      const extra = critters.filter((x) => x.id.startsWith('s-new-') && ['idle', 'asleep', 'finished'].includes(x.status));
+      const extra = critters.filter(
+        (x) => x.id.startsWith('s-new-') && ['idle', 'asleep', 'finished'].includes(x.status),
+      );
       if (extra.length) setStatus(pick(extra).id, 'archived');
     }
   }

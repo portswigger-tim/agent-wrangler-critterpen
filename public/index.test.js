@@ -8,16 +8,22 @@ test('the rail icon is an svg with class="icon", which core sizes on the rail', 
 });
 
 test('parseActivity keeps known kinds and short labels only', () => {
-  assert.deepEqual(parseActivity({ kind: 'activity', events: [
-    { sessionId: 'a', kind: 'git', label: 'git push' },
-    { sessionId: 'a', kind: 'terminal' },
-    { sessionId: 'a', kind: 'spawn' },
-    { sessionId: 'a', kind: 'web', label: 'x'.repeat(41) },
-    { sessionId: '', kind: 'files' },
-  ] }), [
-    { critterId: 'a', kind: 'git', label: 'git push' },
-    { critterId: 'a', kind: 'terminal' },
-  ]);
+  assert.deepEqual(
+    parseActivity({
+      kind: 'activity',
+      events: [
+        { sessionId: 'a', kind: 'git', label: 'git push' },
+        { sessionId: 'a', kind: 'terminal' },
+        { sessionId: 'a', kind: 'spawn' },
+        { sessionId: 'a', kind: 'web', label: 'x'.repeat(41) },
+        { sessionId: '', kind: 'files' },
+      ],
+    }),
+    [
+      { critterId: 'a', kind: 'git', label: 'git push' },
+      { critterId: 'a', kind: 'terminal' },
+    ],
+  );
   assert.deepEqual(parseActivity({ kind: 'other' }), []);
 });
 
@@ -37,10 +43,13 @@ test('clicking a critter opens that session on the board', () => {
 test('clicking a critter marks it seen before opening its session', () => {
   const calls = [];
   penOptions({ openSession: (id) => calls.push(['open', id]) }, (id) => calls.push(['seen', id])).onCritterClick('s1');
-  assert.deepEqual(calls, [['seen', 's1'], ['open', 's1']]);
+  assert.deepEqual(calls, [
+    ['seen', 's1'],
+    ['open', 's1'],
+  ]);
 });
 
-test('finished ids round-trip through the extension\'s own namespaced storage', () => {
+test("finished ids round-trip through the extension's own namespaced storage", () => {
   const kv = new Map();
   const api = { get: (k) => kv.get(k) ?? null, set: (k, v) => kv.set(k, v) };
   const store = finishedStorage(api);

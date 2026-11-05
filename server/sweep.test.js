@@ -9,13 +9,20 @@ import { createActivitySweep, cwdSlug, watchableCards, READ_CAP, SKIP_AHEAD, MAX
 const SECRET = 'ghp_FAKEFAKEFAKE0123456789secret';
 
 let projects;
-beforeEach(() => { projects = fs.mkdtempSync(path.join(os.tmpdir(), 'critter-sweep-')); });
-afterEach(() => { fs.rmSync(projects, { recursive: true, force: true }); });
+beforeEach(() => {
+  projects = fs.mkdtempSync(path.join(os.tmpdir(), 'critter-sweep-'));
+});
+afterEach(() => {
+  fs.rmSync(projects, { recursive: true, force: true });
+});
 
-const toolLine = (cwd, name, input) => `${JSON.stringify({
-  type: 'assistant', cwd, sessionId: 'live-uuid',
-  message: { role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_x', name, input }] },
-})}\n`;
+const toolLine = (cwd, name, input) =>
+  `${JSON.stringify({
+    type: 'assistant',
+    cwd,
+    sessionId: 'live-uuid',
+    message: { role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_x', name, input }] },
+  })}\n`;
 
 function transcript(cwd, name = 'live-uuid.jsonl') {
   const dir = path.join(projects, cwdSlug(cwd));
@@ -33,27 +40,32 @@ function fakeHost(sessions) {
 // realpath is the identity here: temp paths are not what the test is about.
 const sweepFor = () => createActivitySweep({ projectsDir: projects, realpath: async (p) => p });
 
-test('cwdSlug matches Claude Code\'s project folder naming', () => {
+test("cwdSlug matches Claude Code's project folder naming", () => {
   assert.equal(cwdSlug('/Users/a.b/.agent-wrangler/x_y'), '-Users-a-b--agent-wrangler-x-y');
 });
 
 test('cwdSlug shortens long paths the way Claude Code does (observed folder names)', () => {
-  const base = '/private/tmp/claude-501/-Users-tim-birkett-Projects-portswigger-tim-worktrees-noindex-agent-wrangler-workshop-feat-critter-extension/157da3d0-327e-4857-ac8e-7b488535a280/scratchpad/aw-data/sessions/';
-  const prefix = '-private-tmp-claude-501--Users-tim-birkett-Projects-portswigger-tim-worktrees-noindex-agent-wrangler-workshop-feat-critter-extension-157da3d0-327e-4857-ac8e-7b488535a280-scratchpad-aw-data-sessions-20';
+  const base =
+    '/private/tmp/claude-501/-Users-tim-birkett-Projects-portswigger-tim-worktrees-noindex-agent-wrangler-workshop-feat-critter-extension/157da3d0-327e-4857-ac8e-7b488535a280/scratchpad/aw-data/sessions/';
+  const prefix =
+    '-private-tmp-claude-501--Users-tim-birkett-Projects-portswigger-tim-worktrees-noindex-agent-wrangler-workshop-feat-critter-extension-157da3d0-327e-4857-ac8e-7b488535a280-scratchpad-aw-data-sessions-20';
   assert.equal(cwdSlug(`${base}20261104154405`), `${prefix}-uzxg9h`);
   assert.equal(cwdSlug(`${base}20261104154405-17`), `${prefix}-ae37vm`);
   assert.equal(cwdSlug(`${base}20261104154416`), `${prefix}-uzxgad`);
 });
 
 test('watchableCards keeps Claude cards with a cwd of their own', () => {
-  assert.deepEqual(watchableCards([
-    { sessionId: 'a', agent: 'claude', cwd: '/one' },
-    { sessionId: 'b', agent: 'claude', cwd: '/shared' },
-    { sessionId: 'c', agent: 'claude', cwd: '/shared' },
-    { sessionId: 'd', agent: 'codex', cwd: '/two' },
-    { sessionId: 'e', agent: 'claude', cwd: '/three', archived: true },
-    { sessionId: 'f', agent: 'claude', cwd: null },
-  ]), [{ sessionId: 'a', cwd: '/one' }]);
+  assert.deepEqual(
+    watchableCards([
+      { sessionId: 'a', agent: 'claude', cwd: '/one' },
+      { sessionId: 'b', agent: 'claude', cwd: '/shared' },
+      { sessionId: 'c', agent: 'claude', cwd: '/shared' },
+      { sessionId: 'd', agent: 'codex', cwd: '/two' },
+      { sessionId: 'e', agent: 'claude', cwd: '/three', archived: true },
+      { sessionId: 'f', agent: 'claude', cwd: null },
+    ]),
+    [{ sessionId: 'a', cwd: '/one' }],
+  );
 });
 
 test('first sight starts at the end; new tool lines are broadcast as activity', async () => {
@@ -62,12 +74,20 @@ test('first sight starts at the end; new tool lines are broadcast as activity', 
   const sweep = sweepFor();
   const { sent, host } = fakeHost([{ sessionId: 'card-1', agent: 'claude', cwd: '/repo' }]);
   assert.deepEqual(await sweep.run({ host }), []);
-  fs.appendFileSync(file, toolLine('/repo', 'Edit', { file_path: '/repo/a.js' }) + toolLine('/repo', 'Bash', { command: 'git commit -m x' }));
+  fs.appendFileSync(
+    file,
+    toolLine('/repo', 'Edit', { file_path: '/repo/a.js' }) + toolLine('/repo', 'Bash', { command: 'git commit -m x' }),
+  );
   await sweep.run({ host });
-  assert.deepEqual(sent, [{ kind: 'activity', events: [
-    { sessionId: 'card-1', kind: 'files', label: 'Edit' },
-    { sessionId: 'card-1', kind: 'git', label: 'git commit' },
-  ] }]);
+  assert.deepEqual(sent, [
+    {
+      kind: 'activity',
+      events: [
+        { sessionId: 'card-1', kind: 'files', label: 'Edit' },
+        { sessionId: 'card-1', kind: 'git', label: 'git commit' },
+      ],
+    },
+  ]);
   await sweep.run({ host });
   assert.equal(sent.length, 1, 'nothing new, nothing sent');
 });
@@ -91,17 +111,23 @@ test('a secret in a Bash command never reaches the broadcast payload', async () 
   const sweep = sweepFor();
   const { sent, host } = fakeHost([{ sessionId: 'c', agent: 'claude', cwd: '/repo' }]);
   await sweep.run({ host });
-  fs.appendFileSync(file, [
-    toolLine('/repo', 'Bash', { command: `curl -H "Authorization: token ${SECRET}" https://api.github.com/user` }),
-    toolLine('/repo', 'Bash', { command: `GH_TOKEN=${SECRET} gh pr create --title t` }),
-    toolLine('/repo', 'Bash', { command: `git -c http.extraheader="AUTHORIZATION: ${SECRET}" push` }),
-    toolLine('/repo', 'Bash', { command: `echo ${SECRET} > ~/.netrc` }),
-  ].join(''));
+  fs.appendFileSync(
+    file,
+    [
+      toolLine('/repo', 'Bash', { command: `curl -H "Authorization: token ${SECRET}" https://api.github.com/user` }),
+      toolLine('/repo', 'Bash', { command: `GH_TOKEN=${SECRET} gh pr create --title t` }),
+      toolLine('/repo', 'Bash', { command: `git -c http.extraheader="AUTHORIZATION: ${SECRET}" push` }),
+      toolLine('/repo', 'Bash', { command: `echo ${SECRET} > ~/.netrc` }),
+    ].join(''),
+  );
   await sweep.run({ host });
   const payload = JSON.stringify(sent);
   assert.ok(!payload.includes('FAKEFAKE'), payload);
   assert.ok(!payload.includes('github.com'), payload);
-  assert.deepEqual(sent[0].events.map((e) => e.label), ['curl', 'gh pr create', 'git push', undefined]);
+  assert.deepEqual(
+    sent[0].events.map((e) => e.label),
+    ['curl', 'gh pr create', 'git push', undefined],
+  );
 });
 
 test('a cwd two cards share is skipped, however busy its transcript', async () => {
@@ -118,7 +144,7 @@ test('a cwd two cards share is skipped, however busy its transcript', async () =
   assert.equal(sweep.watching, 0);
 });
 
-test('a transcript that started in another cwd is not the card\'s (lossy slugs)', async () => {
+test("a transcript that started in another cwd is not the card's (lossy slugs)", async () => {
   // /a/b/c and /a/b-c share a project folder; this transcript began in /a/b/c.
   const dir = path.join(projects, cwdSlug('/a/b-c'));
   fs.mkdirSync(dir, { recursive: true });
@@ -132,12 +158,15 @@ test('a transcript that started in another cwd is not the card\'s (lossy slugs)'
   assert.deepEqual(sent, []);
 });
 
-test('lines written after the agent cd\'d elsewhere still count', async () => {
+test("lines written after the agent cd'd elsewhere still count", async () => {
   const file = transcript('/repo');
   const sweep = sweepFor();
   const { sent, host } = fakeHost([{ sessionId: 'c', agent: 'claude', cwd: '/repo' }]);
   await sweep.run({ host });
-  fs.appendFileSync(file, toolLine('/repo/sub', 'Bash', { command: 'git commit -m x' }) + toolLine('/elsewhere', 'Write', {}));
+  fs.appendFileSync(
+    file,
+    toolLine('/repo/sub', 'Bash', { command: 'git commit -m x' }) + toolLine('/elsewhere', 'Write', {}),
+  );
   await sweep.run({ host });
   assert.deepEqual(sent[0].events, [
     { sessionId: 'c', kind: 'git', label: 'git commit' },
