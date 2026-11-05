@@ -19,6 +19,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      # First, so its pre step locks down egress before any other step runs.
+      - uses: portswigger-tim/safer-runner-action@fd9efbcea4d9f8a00ca402f1abfeb321bdbc31f6 # v2.0.0-beta.2
+        with:
+          mode: enforce
+          allowed-domains: |
+            pypi.org
+            files.pythonhosted.org
+            registry.npmjs.org
+          disable-docker: true
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
