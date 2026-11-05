@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 10
     steps:
       # First, so its pre step locks down egress before any other step runs.
-      - uses: portswigger-tim/safer-runner-action@fd9efbcea4d9f8a00ca402f1abfeb321bdbc31f6 # v2.0.0-beta.2
+      - uses: portswigger-tim/safer-runner-action@235c82c29fd4f1c1f0791e433e30f661dd287b07 # v2.0.0-beta.3
         with:
           mode: enforce
           allowed-domains: |
