@@ -154,7 +154,8 @@ pre-commit install
 
 Before every commit and every merge commit they run the tests, [Biome](https://biomejs.dev)
 formatting and lint (settings in `biome.json`), shellcheck and some file hygiene checks (whitespace, line endings, merge markers, large files, private keys).
-`pre-commit run --all-files` runs them by hand.
+`pre-commit run --all-files` runs them by hand. CI runs the same command on every
+pull request and push to `main`.
 
 ## Trademarks
 
