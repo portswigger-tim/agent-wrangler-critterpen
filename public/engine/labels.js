@@ -1,8 +1,6 @@
 // Pure name-label placement: every critter's label gets a spot that doesn't
 // cover another label (or a building caption), most important critters first.
 
-import { truncateMiddle } from './util.js';
-
 /** Who gets first pick of a clear spot: the critters you most need to read. */
 export const LABEL_PRIORITY = ['needs-you', 'finished', 'working', 'thinking', 'error', 'idle', 'asleep', 'archived'];
 
@@ -10,7 +8,11 @@ const LABEL_H = 16;
 /** Most a label above the head will rise to clear a hat or bubble (px). */
 export const MAX_HEADROOM = 14;
 
-const loose = (s) => String(s || '').toLowerCase().replace(/[\s_-]+/g, ' ').trim();
+const loose = (s) =>
+  String(s || '')
+    .toLowerCase()
+    .replace(/[\s_-]+/g, ' ')
+    .trim();
 
 /**
  * Drop a leading copy of the island's task name from a session name: the
@@ -25,7 +27,8 @@ export function stripTaskPrefix(name, taskName) {
   const want = loose(taskName);
   if (!want) return full;
   // Walk the name, matching the task name loosely character by character.
-  let i = 0, j = 0;
+  let i = 0,
+    j = 0;
   const sep = /[\s_-]/;
   while (i < full.length && j < want.length) {
     const c = full[i];
@@ -37,7 +40,8 @@ export function stripTaskPrefix(name, taskName) {
       continue;
     }
     if (c.toLowerCase() !== want[j]) return full;
-    i++; j++;
+    i++;
+    j++;
   }
   if (j < want.length) return full;
   // Only at a word boundary: "Docs site: …", "Docs-site-x …", not "Docs siteful".
@@ -54,7 +58,10 @@ const overlaps = (a, b) => a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
  * ("Investigate…", "L7…"), or nothing if even that won't fit. Never a fragment.
  */
 export function shortLabel(text, maxWidth, measure) {
-  const words = String(text).trim().split(/\s+/).filter((w) => /\p{L}/u.test(w)); // a word with a letter: "L7" yes, "#2" no
+  const words = String(text)
+    .trim()
+    .split(/\s+/)
+    .filter((w) => /\p{L}/u.test(w)); // a word with a letter: "L7" yes, "#2" no
   if (words.length < 2) return '';
   const t = `${words[0]}…`;
   return measure(t) <= maxWidth ? t : '';
@@ -114,11 +121,15 @@ function candidates(it) {
  */
 export function placeLabels(items, measure, blocked = [], bounds = null) {
   const inside = (b) => !bounds || (b.l >= bounds.l && b.r <= bounds.r && b.t >= bounds.t && b.b <= bounds.b);
-  const rank = (s) => { const i = LABEL_PRIORITY.indexOf(s); return i < 0 ? LABEL_PRIORITY.length : i; };
+  const rank = (s) => {
+    const i = LABEL_PRIORITY.indexOf(s);
+    return i < 0 ? LABEL_PRIORITY.length : i;
+  };
   // Needs-you first, then parents (the ones you click), then by status, then front-most.
   const tier = (it) => (it.status === 'needs-you' ? 0 : it.parent ? 1 : 2);
-  const order = [...items].sort((a, b) => tier(a) - tier(b) || rank(a.status) - rank(b.status)
-    || b.groundY - a.groundY || (a.id < b.id ? -1 : 1));
+  const order = [...items].sort(
+    (a, b) => tier(a) - tier(b) || rank(a.status) - rank(b.status) || b.groundY - a.groundY || (a.id < b.id ? -1 : 1),
+  );
   // Every critter's body is off limits too, so a name never sits on a neighbour.
   // `body` is where it is drawn this frame (hops included); else it stands on groundY.
   const bodies = items.map((it) => {
@@ -136,15 +147,28 @@ export function placeLabels(items, measure, blocked = [], bounds = null) {
       const w = measure(text, it) + 6;
       const boxAt = (p) => ({ l: p.x - w / 2, r: p.x + w / 2, t: p.y - LABEL_H / 2, b: p.y + LABEL_H / 2 });
       const free = spots.find((p) => inside(boxAt(p)) && !taken.some((o) => overlaps(boxAt(p), o)));
-      if (free) { placed = { text, at: free, box: boxAt(free) }; break; }
+      if (free) {
+        placed = { text, at: free, box: boxAt(free) };
+        break;
+      }
     }
     if (placed) {
       taken.push(placed.box);
-      out.push({ id: it.id, text: placed.text, x: placed.at.x, y: placed.at.y, home: spots[0], visible: true, hidden: false, box: placed.box });
+      out.push({
+        id: it.id,
+        text: placed.text,
+        x: placed.at.x,
+        y: placed.at.y,
+        home: spots[0],
+        visible: true,
+        hidden: false,
+        box: placed.box,
+      });
     } else {
       // Nowhere close is clear: at the default spot, whisper it only if that
       // covers nothing at all; otherwise hide it (hover still shows the name).
-      const w = measure(it.text, it) + 6, h = spots[0];
+      const w = measure(it.text, it) + 6,
+        h = spots[0];
       const box = { l: h.x - w / 2, r: h.x + w / 2, t: h.y - LABEL_H / 2, b: h.y + LABEL_H / 2 };
       const ownBody = bodies[items.indexOf(it)];
       const hidden = !inside(box) || taken.some((o) => o !== ownBody && overlaps(box, o));

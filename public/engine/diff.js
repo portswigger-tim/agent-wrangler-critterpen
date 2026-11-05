@@ -24,10 +24,16 @@ const SAME_FIELDS = ['name', 'taskId', 'taskName', 'parentId', 'agent'];
 export function diffCritters(prev, next) {
   const nextMap = new Map();
   for (const c of next) nextMap.set(c.id, c);
-  const added = [], updated = [], statusChanged = [], removed = [];
+  const added = [],
+    updated = [],
+    statusChanged = [],
+    removed = [];
   for (const c of nextMap.values()) {
     const old = prev.get(c.id);
-    if (!old) { added.push(c); continue; }
+    if (!old) {
+      added.push(c);
+      continue;
+    }
     if (old.status !== c.status) statusChanged.push({ id: c.id, from: old.status, to: c.status });
     if (SAME_FIELDS.some((k) => old[k] !== c[k])) updated.push(c);
   }

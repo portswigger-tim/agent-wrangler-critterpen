@@ -4,7 +4,18 @@
 import { TAU } from './util.js';
 import { toCss, mix, lighten, darken, parseColor, hslToRgb, inkFor } from './color.js';
 
-export const ACCESSORIES = ['none', 'party', 'tophat', 'beanie', 'bow', 'antenna', 'sprout', 'crown', 'propeller', 'headphones'];
+export const ACCESSORIES = [
+  'none',
+  'party',
+  'tophat',
+  'beanie',
+  'bow',
+  'antenna',
+  'sprout',
+  'crown',
+  'propeller',
+  'headphones',
+];
 
 const INK = parseColor('#1d2026');
 const WHITE = parseColor('#ffffff');
@@ -27,14 +38,22 @@ export function agentTint(agent, hue) {
 /** Projectile / ring colour per event kind. */
 export function kindColor(kind, pal) {
   switch (kind) {
-    case 'git': return pal.accent;
-    case 'pr': return pal.green;
-    case 'jira': return pal.blue;
-    case 'terminal': return pal.yellow;
-    case 'files': return pal.dark ? lighten(pal.fg, 0.1) : mix(pal.bg, WHITE, 0.6);
-    case 'web': return pal.red;
-    case 'human': return pal.yellow;
-    default: return pal.accent;
+    case 'git':
+      return pal.accent;
+    case 'pr':
+      return pal.green;
+    case 'jira':
+      return pal.blue;
+    case 'terminal':
+      return pal.yellow;
+    case 'files':
+      return pal.dark ? lighten(pal.fg, 0.1) : mix(pal.bg, WHITE, 0.6);
+    case 'web':
+      return pal.red;
+    case 'human':
+      return pal.yellow;
+    default:
+      return pal.accent;
   }
 }
 
@@ -104,14 +123,17 @@ export function drawCritter(ctx, p, pal, t) {
   }
 
   // Feet: little ovals that peek out under the body.
-  const fd = p.feetDrop || 0, fs = p.feetStep || 0;
+  const fd = p.feetDrop || 0,
+    fs = p.feetStep || 0;
   ctx.fillStyle = toCss(mix(color, line, 0.35));
   ctx.strokeStyle = toCss(line, 0.6);
   ctx.lineWidth = lw * 0.8;
   ellipse(ctx, -r * 0.4 + fs * r * 0.12, -r * 0.08 + fd * r * 0.25 - Math.max(0, fs) * r * 0.1, r * 0.27, r * 0.17);
-  ctx.fill(); ctx.stroke();
+  ctx.fill();
+  ctx.stroke();
   ellipse(ctx, r * 0.4 + fs * r * 0.12, -r * 0.08 + fd * r * 0.25 - Math.max(0, -fs) * r * 0.1, r * 0.27, r * 0.17);
-  ctx.fill(); ctx.stroke();
+  ctx.fill();
+  ctx.stroke();
 
   // Arms sit behind the body: both up for a stretch, else the waving one.
   if (p.armsUp > 0.01) {
@@ -123,7 +145,8 @@ export function drawCritter(ctx, p, pal, t) {
   drawBody(ctx, r, color, line, lw, pal);
 
   // Face, nudged toward where the critter is looking.
-  const gx = clampN(p.lookX || 0), gy = clampN(p.lookY || 0);
+  const gx = clampN(p.lookX || 0),
+    gy = clampN(p.lookY || 0);
   ctx.save();
   ctx.translate(gx * r * 0.14, gy * r * 0.08);
   if (p.cheeks !== false) drawBlush(ctx, r, p.eyes === 'happy' || p.mouth === 'grin' ? 1.25 : 1);
@@ -189,7 +212,8 @@ function drawBody(ctx, r, color, line, lw, pal) {
 
 function drawBlush(ctx, r, amount) {
   for (const side of [-1, 1]) {
-    const cx = side * r * 0.6, cy = -r * 0.74;
+    const cx = side * r * 0.6,
+      cy = -r * 0.74;
     ctx.save();
     ctx.translate(cx, cy);
     ctx.scale(1, 0.6);
@@ -220,7 +244,8 @@ function drawArm(ctx, r, angle, line, color, side) {
 
 function drawEyes(ctx, r, p, t, body, gx, gy) {
   const ink = p.eyeInk || INK;
-  const ex = r * 0.38, ey = -r * 0.99;
+  const ex = r * 0.38,
+    ey = -r * 0.99;
   const eyes = p.eyes || 'open';
   const blink = p.blink == null ? 1 : p.blink;
   const lidTop = clamp01(Math.max(p.lidTop || 0, 1 - blink));
@@ -240,7 +265,8 @@ function drawEyes(ctx, r, p, t, body, gx, gy) {
       ctx.beginPath();
       for (let a = 0; a <= 3.2 * Math.PI; a += 0.25) {
         const rr = (a / (3.2 * Math.PI)) * r * 0.19;
-        const px = Math.cos(a) * rr, py = Math.sin(a) * rr;
+        const px = Math.cos(a) * rr,
+          py = Math.sin(a) * rr;
         a === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
       }
       ctx.stroke();
@@ -255,8 +281,12 @@ function drawEyes(ctx, r, p, t, body, gx, gy) {
       ctx.arc(cx, ey - r * 0.03, r * 0.155, 0.12 * Math.PI, 0.88 * Math.PI);
       ctx.stroke();
       ctx.lineWidth = Math.max(0.8, r * 0.045);
-      const lx = cx + side * r * 0.13, ly = ey + r * 0.03;
-      ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx + side * r * 0.07, ly - r * 0.03); ctx.stroke();
+      const lx = cx + side * r * 0.13,
+        ly = ey + r * 0.03;
+      ctx.beginPath();
+      ctx.moveTo(lx, ly);
+      ctx.lineTo(lx + side * r * 0.07, ly - r * 0.03);
+      ctx.stroke();
       ctx.lineWidth = Math.max(1.1, r * 0.075);
     } else {
       drawOpenEye(ctx, r, p, cx, ey, side, eyes === 'wide' ? 1.12 : 1, lidTop, lidBot, gx, gy, ink, body, t);
@@ -266,25 +296,45 @@ function drawEyes(ctx, r, p, t, body, gx, gy) {
 
 /** A big glossy eye: dark iris, agent-tinted glow, two highlights, optional lids. */
 function drawOpenEye(ctx, r, p, cx, ey, side, big, lidTop, lidBot, gx, gy, ink, body, t) {
-  const rx = r * 0.185 * big, ry = r * 0.24 * big;
+  const rx = r * 0.185 * big,
+    ry = r * 0.24 * big;
   const tint = p.tint || body;
-  const px = cx + gx * rx * 0.3, py = ey + gy * ry * 0.25;
+  const px = cx + gx * rx * 0.3,
+    py = ey + gy * ry * 0.25;
   // Lid edges: the top one droops a touch in the middle and tilts toward the
   // nose; the bottom one is a cheek pushing up. The eye is clipped between
   // them, so the skin simply shows through (no painted lid to mismatch).
   const tilt = (p.lidTilt || 0) * ry;
-  const xOut = cx + side * rx * 1.1, xIn = cx - side * rx * 1.1;
-  const yT = ey - ry + 2 * ry * lidTop, yB = ey + ry - 2 * ry * lidBot;
-  const topEdge = () => { ctx.moveTo(xOut, yT - tilt); ctx.quadraticCurveTo(cx, yT + ry * 0.16, xIn, yT + tilt); };
-  const botEdge = () => { ctx.moveTo(cx + rx * 1.1, yB + ry * 0.1); ctx.quadraticCurveTo(cx, yB - ry * 0.18, cx - rx * 1.1, yB + ry * 0.1); };
+  const xOut = cx + side * rx * 1.1,
+    xIn = cx - side * rx * 1.1;
+  const yT = ey - ry + 2 * ry * lidTop,
+    yB = ey + ry - 2 * ry * lidBot;
+  const topEdge = () => {
+    ctx.moveTo(xOut, yT - tilt);
+    ctx.quadraticCurveTo(cx, yT + ry * 0.16, xIn, yT + tilt);
+  };
+  const botEdge = () => {
+    ctx.moveTo(cx + rx * 1.1, yB + ry * 0.1);
+    ctx.quadraticCurveTo(cx, yB - ry * 0.18, cx - rx * 1.1, yB + ry * 0.1);
+  };
   ctx.save();
   ellipse(ctx, cx, ey, rx, ry);
   ctx.clip();
   if (lidTop > 0.01) {
-    ctx.beginPath(); topEdge(); ctx.lineTo(xIn, ey + ry + 2); ctx.lineTo(xOut, ey + ry + 2); ctx.closePath(); ctx.clip();
+    ctx.beginPath();
+    topEdge();
+    ctx.lineTo(xIn, ey + ry + 2);
+    ctx.lineTo(xOut, ey + ry + 2);
+    ctx.closePath();
+    ctx.clip();
   }
   if (lidBot > 0.01) {
-    ctx.beginPath(); botEdge(); ctx.lineTo(cx - rx * 1.1, ey - ry - 2); ctx.lineTo(cx + rx * 1.1, ey - ry - 2); ctx.closePath(); ctx.clip();
+    ctx.beginPath();
+    botEdge();
+    ctx.lineTo(cx - rx * 1.1, ey - ry - 2);
+    ctx.lineTo(cx + rx * 1.1, ey - ry - 2);
+    ctx.closePath();
+    ctx.clip();
   }
   ctx.fillStyle = toCss(ink);
   ctx.fillRect(cx - rx, ey - ry, rx * 2, ry * 2);
@@ -297,7 +347,8 @@ function drawOpenEye(ctx, r, p, cx, ey, side, big, lidTop, lidBot, gx, gy, ink, 
   ellipse(ctx, px, py - ry * 0.05, rx * 0.5, ry * 0.5);
   ctx.fill();
   // Highlights drift a little with the gaze (they're reflections of the sky).
-  const hx = gx * rx * 0.12, hy = gy * ry * 0.08 + Math.max(0, lidTop - 0.25) * ry;
+  const hx = gx * rx * 0.12,
+    hy = gy * ry * 0.08 + Math.max(0, lidTop - 0.25) * ry;
   ctx.fillStyle = toCss(WHITE, 0.96);
   ellipse(ctx, cx - rx * 0.28 + hx, ey - ry * 0.36 + hy, rx * 0.4, ry * 0.32, -0.3);
   ctx.fill();
@@ -320,14 +371,20 @@ function drawOpenEye(ctx, r, p, cx, ey, side, big, lidTop, lidBot, gx, gy, ink, 
     ctx.clip();
     ctx.lineWidth = Math.max(0.9, r * 0.055);
     ctx.strokeStyle = toCss(ink);
-    ctx.beginPath(); topEdge(); ctx.stroke();
+    ctx.beginPath();
+    topEdge();
+    ctx.stroke();
     ctx.restore();
   }
   // Sleepy lids get a lash flick at the outer corner.
   if (lidTop > 0.35) {
-    const lx = cx + side * rx * 0.95, ly = yT - tilt;
+    const lx = cx + side * rx * 0.95,
+      ly = yT - tilt;
     ctx.lineWidth = Math.max(0.8, r * 0.045);
-    ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx + side * r * 0.07, ly - r * 0.04); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(lx, ly);
+    ctx.lineTo(lx + side * r * 0.07, ly - r * 0.04);
+    ctx.stroke();
   }
 }
 
@@ -352,38 +409,73 @@ function drawMouth(ctx, r, mouth, ink, open = 0) {
   ctx.lineJoin = 'round';
   ctx.beginPath();
   switch (mouth) {
-    case 'smile': ctx.arc(0, my - r * 0.08, r * 0.12, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke(); break;
+    case 'smile':
+      ctx.arc(0, my - r * 0.08, r * 0.12, 0.2 * Math.PI, 0.8 * Math.PI);
+      ctx.stroke();
+      break;
     case 'cat':
       ctx.arc(-r * 0.065, my - r * 0.03, r * 0.065, 0.1 * Math.PI, 0.95 * Math.PI);
       ctx.moveTo(r * 0.13, my - r * 0.02);
       ctx.arc(r * 0.065, my - r * 0.03, r * 0.065, 0.05 * Math.PI, 0.9 * Math.PI);
-      ctx.stroke(); break;
+      ctx.stroke();
+      break;
     case 'grin':
-      ctx.arc(0, my - r * 0.06, r * 0.17, 0, Math.PI); ctx.closePath();
-      ctx.fillStyle = toCss(ROSE); ctx.fill();
-      ctx.save(); ctx.clip();
-      ctx.fillStyle = toCss(BLUSH, 0.9); ellipse(ctx, 0, my + r * 0.1, r * 0.1, r * 0.07); ctx.fill();
-      ctx.restore(); break;
+      ctx.arc(0, my - r * 0.06, r * 0.17, 0, Math.PI);
+      ctx.closePath();
+      ctx.fillStyle = toCss(ROSE);
+      ctx.fill();
+      ctx.save();
+      ctx.clip();
+      ctx.fillStyle = toCss(BLUSH, 0.9);
+      ellipse(ctx, 0, my + r * 0.1, r * 0.1, r * 0.07);
+      ctx.fill();
+      ctx.restore();
+      break;
     case 'yawn': {
       const k = open || 0.6;
-      const rx = r * (0.07 + 0.05 * k), ry = r * (0.05 + 0.13 * k);
+      const rx = r * (0.07 + 0.05 * k),
+        ry = r * (0.05 + 0.13 * k);
       ellipse(ctx, 0, my + ry * 0.2, rx, ry);
-      ctx.fillStyle = toCss(ROSE); ctx.fill();
-      ctx.save(); ctx.clip();
-      ctx.fillStyle = toCss(BLUSH, 0.9); ellipse(ctx, 0, my + ry * 1.05, rx * 0.8, ry * 0.5); ctx.fill();
-      ctx.restore(); break;
+      ctx.fillStyle = toCss(ROSE);
+      ctx.fill();
+      ctx.save();
+      ctx.clip();
+      ctx.fillStyle = toCss(BLUSH, 0.9);
+      ellipse(ctx, 0, my + ry * 1.05, rx * 0.8, ry * 0.5);
+      ctx.fill();
+      ctx.restore();
+      break;
     }
-    case 'o': ellipse(ctx, 0, my, r * 0.07, r * 0.085); ctx.fillStyle = toCss(ROSE); ctx.fill(); break;
-    case 'small-o': ellipse(ctx, 0, my, r * 0.045, r * 0.05); ctx.fillStyle = toCss(ROSE); ctx.fill(); break;
+    case 'o':
+      ellipse(ctx, 0, my, r * 0.07, r * 0.085);
+      ctx.fillStyle = toCss(ROSE);
+      ctx.fill();
+      break;
+    case 'small-o':
+      ellipse(ctx, 0, my, r * 0.045, r * 0.05);
+      ctx.fillStyle = toCss(ROSE);
+      ctx.fill();
+      break;
     case 'wavy':
       for (let i = 0; i <= 4; i++) {
-        const px = -r * 0.16 + i * r * 0.08, py = my + (i % 2 ? -1 : 1) * r * 0.035;
+        const px = -r * 0.16 + i * r * 0.08,
+          py = my + (i % 2 ? -1 : 1) * r * 0.035;
         i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
       }
-      ctx.stroke(); break;
-    case 'flat': ctx.moveTo(-r * 0.07, my); ctx.lineTo(r * 0.07, my - r * 0.015); ctx.stroke(); break;
-    case 'hmm': ctx.moveTo(-r * 0.02, my + r * 0.01); ctx.quadraticCurveTo(r * 0.06, my - r * 0.03, r * 0.12, my - r * 0.01); ctx.stroke(); break;
-    default: break;
+      ctx.stroke();
+      break;
+    case 'flat':
+      ctx.moveTo(-r * 0.07, my);
+      ctx.lineTo(r * 0.07, my - r * 0.015);
+      ctx.stroke();
+      break;
+    case 'hmm':
+      ctx.moveTo(-r * 0.02, my + r * 0.01);
+      ctx.quadraticCurveTo(r * 0.06, my - r * 0.03, r * 0.12, my - r * 0.01);
+      ctx.stroke();
+      break;
+    default:
+      break;
   }
 }
 
@@ -406,11 +498,17 @@ export function drawChatBubble(ctx, x, y, b, pal, r) {
     roundRect(ctx, -12, -18, 24, 14, 7);
     ctx.fillStyle = toCss(fill, 0.95);
     ctx.fill();
-    ctx.beginPath(); ctx.moveTo(-side * 6, -5); ctx.lineTo(-side * 10, 0); ctx.lineTo(-side * 1, -5); ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-side * 6, -5);
+    ctx.lineTo(-side * 10, 0);
+    ctx.lineTo(-side * 1, -5);
+    ctx.closePath();
+    ctx.fill();
     for (let i = 0; i < 3; i++) {
       const on = (k * 6 - i * 0.35) % 1.2 < 0.8;
       ctx.fillStyle = toCss(pal.fg, on ? 0.75 : 0.3);
-      ellipse(ctx, -6 + i * 6, -11, 1.8, 1.8); ctx.fill();
+      ellipse(ctx, -6 + i * 6, -11, 1.8, 1.8);
+      ctx.fill();
     }
   } else if (b.kind === 'heart') {
     // Rises and fades, swaying.
@@ -423,7 +521,8 @@ export function drawChatBubble(ctx, x, y, b, pal, r) {
     ctx.bezierCurveTo(4, -8, 8, -1, 0, 5);
     ctx.fill();
     ctx.fillStyle = toCss(WHITE, 0.7);
-    ellipse(ctx, -2.8, -3, 1.3, 1, -0.6); ctx.fill();
+    ellipse(ctx, -2.8, -3, 1.3, 1, -0.6);
+    ctx.fill();
   } else if (b.kind === 'note') {
     const q = (k * 2) % 1;
     ctx.translate(Math.sin(q * 6) * 3, -q * 12 - 4);
@@ -437,13 +536,14 @@ export function drawChatBubble(ctx, x, y, b, pal, r) {
   ctx.restore();
 }
 
-const ease3 = (t) => 1 - Math.pow(1 - t, 3);
+const ease3 = (t) => 1 - (1 - t) ** 3;
 
 /** Accessory sitting on the head top (0, -2r), squashing with the body. */
 export function drawAccessory(ctx, kind, r, tint, t, p = {}) {
   if (kind === 'none') return;
   const top = -2 * r;
-  const dark = darken(tint, 0.3), light = lighten(tint, 0.45);
+  const dark = darken(tint, 0.3),
+    light = lighten(tint, 0.45);
   ctx.save();
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
@@ -454,21 +554,37 @@ export function drawAccessory(ctx, kind, r, tint, t, p = {}) {
       ctx.translate(r * 0.18, top + r * 0.2);
       ctx.rotate(0.22);
       ctx.beginPath();
-      ctx.moveTo(-r * 0.36, 0); ctx.lineTo(0, -r * 0.95); ctx.lineTo(r * 0.36, 0); ctx.closePath();
-      ctx.fillStyle = toCss(tint); ctx.fill(); ctx.stroke();
-      ctx.save(); ctx.clip();
-      ctx.strokeStyle = toCss(light); ctx.lineWidth = r * 0.1;
-      for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(-r, -r * (0.15 + i * 0.3)); ctx.lineTo(r, -r * (0.35 + i * 0.3)); ctx.stroke(); }
+      ctx.moveTo(-r * 0.36, 0);
+      ctx.lineTo(0, -r * 0.95);
+      ctx.lineTo(r * 0.36, 0);
+      ctx.closePath();
+      ctx.fillStyle = toCss(tint);
+      ctx.fill();
+      ctx.stroke();
+      ctx.save();
+      ctx.clip();
+      ctx.strokeStyle = toCss(light);
+      ctx.lineWidth = r * 0.1;
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(-r, -r * (0.15 + i * 0.3));
+        ctx.lineTo(r, -r * (0.35 + i * 0.3));
+        ctx.stroke();
+      }
       ctx.restore();
-      ctx.fillStyle = toCss(light); ellipse(ctx, 0, -r * 0.97, r * 0.13, r * 0.13); ctx.fill();
+      ctx.fillStyle = toCss(light);
+      ellipse(ctx, 0, -r * 0.97, r * 0.13, r * 0.13);
+      ctx.fill();
       break;
     }
     case 'tophat': {
       ctx.translate(0, top + r * 0.16);
       ctx.fillStyle = toCss(dark);
-      ellipse(ctx, 0, 0, r * 0.55, r * 0.11); ctx.fill();
+      ellipse(ctx, 0, 0, r * 0.55, r * 0.11);
+      ctx.fill();
       roundRect(ctx, -r * 0.32, -r * 0.62, r * 0.64, r * 0.62, r * 0.06);
-      ctx.fillStyle = toCss(darken(tint, 0.45)); ctx.fill();
+      ctx.fillStyle = toCss(darken(tint, 0.45));
+      ctx.fill();
       ctx.fillStyle = toCss(tint);
       ctx.fillRect(-r * 0.32, -r * 0.2, r * 0.64, r * 0.12);
       break;
@@ -478,10 +594,15 @@ export function drawAccessory(ctx, kind, r, tint, t, p = {}) {
       ctx.beginPath();
       ctx.ellipse(0, 0, r * 0.74, r * 0.56, 0, Math.PI, TAU);
       ctx.closePath();
-      ctx.fillStyle = toCss(tint); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = toCss(tint);
+      ctx.fill();
+      ctx.stroke();
       roundRect(ctx, -r * 0.76, -r * 0.08, r * 1.52, r * 0.2, r * 0.1);
-      ctx.fillStyle = toCss(dark); ctx.fill();
-      ctx.fillStyle = toCss(light); ellipse(ctx, 0, -r * 0.6, r * 0.16, r * 0.16); ctx.fill();
+      ctx.fillStyle = toCss(dark);
+      ctx.fill();
+      ctx.fillStyle = toCss(light);
+      ellipse(ctx, 0, -r * 0.6, r * 0.16, r * 0.16);
+      ctx.fill();
       break;
     }
     case 'bow': {
@@ -490,10 +611,16 @@ export function drawAccessory(ctx, kind, r, tint, t, p = {}) {
       ctx.fillStyle = toCss(tint);
       for (const s of [-1, 1]) {
         ctx.beginPath();
-        ctx.moveTo(0, 0); ctx.lineTo(s * r * 0.36, -r * 0.2); ctx.lineTo(s * r * 0.36, r * 0.2); ctx.closePath();
-        ctx.fill(); ctx.stroke();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(s * r * 0.36, -r * 0.2);
+        ctx.lineTo(s * r * 0.36, r * 0.2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
       }
-      ctx.fillStyle = toCss(dark); ellipse(ctx, 0, 0, r * 0.09, r * 0.09); ctx.fill();
+      ctx.fillStyle = toCss(dark);
+      ellipse(ctx, 0, 0, r * 0.09, r * 0.09);
+      ctx.fill();
       break;
     }
     case 'antenna': {
@@ -503,53 +630,89 @@ export function drawAccessory(ctx, kind, r, tint, t, p = {}) {
       ctx.quadraticCurveTo(sway * 0.3, top - r * 0.35, sway, top - r * 0.65);
       ctx.stroke();
       const g = ctx.createRadialGradient(sway, top - r * 0.7, 0, sway, top - r * 0.7, r * 0.3);
-      g.addColorStop(0, toCss(light)); g.addColorStop(0.5, toCss(tint)); g.addColorStop(1, toCss(tint, 0));
-      ctx.fillStyle = g; ellipse(ctx, sway, top - r * 0.7, r * 0.3, r * 0.3); ctx.fill();
-      ctx.fillStyle = toCss(tint); ellipse(ctx, sway, top - r * 0.7, r * 0.13, r * 0.13); ctx.fill();
+      g.addColorStop(0, toCss(light));
+      g.addColorStop(0.5, toCss(tint));
+      g.addColorStop(1, toCss(tint, 0));
+      ctx.fillStyle = g;
+      ellipse(ctx, sway, top - r * 0.7, r * 0.3, r * 0.3);
+      ctx.fill();
+      ctx.fillStyle = toCss(tint);
+      ellipse(ctx, sway, top - r * 0.7, r * 0.13, r * 0.13);
+      ctx.fill();
       break;
     }
     case 'sprout': {
       const sway = Math.sin(t * 2 + (p.phase || 0)) * 0.15;
       ctx.translate(0, top + r * 0.05);
       ctx.rotate(sway);
-      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -r * 0.4); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -r * 0.4);
+      ctx.stroke();
       ctx.fillStyle = toCss(tint);
-      ellipse(ctx, -r * 0.2, -r * 0.42, r * 0.22, r * 0.1, -0.5); ctx.fill(); ctx.stroke();
-      ellipse(ctx, r * 0.2, -r * 0.48, r * 0.22, r * 0.1, 0.5); ctx.fill(); ctx.stroke();
+      ellipse(ctx, -r * 0.2, -r * 0.42, r * 0.22, r * 0.1, -0.5);
+      ctx.fill();
+      ctx.stroke();
+      ellipse(ctx, r * 0.2, -r * 0.48, r * 0.22, r * 0.1, 0.5);
+      ctx.fill();
+      ctx.stroke();
       break;
     }
     case 'crown': {
       ctx.translate(0, top + r * 0.2);
       ctx.beginPath();
-      ctx.moveTo(-r * 0.38, 0); ctx.lineTo(-r * 0.42, -r * 0.4); ctx.lineTo(-r * 0.18, -r * 0.18);
-      ctx.lineTo(0, -r * 0.5); ctx.lineTo(r * 0.18, -r * 0.18); ctx.lineTo(r * 0.42, -r * 0.4); ctx.lineTo(r * 0.38, 0);
+      ctx.moveTo(-r * 0.38, 0);
+      ctx.lineTo(-r * 0.42, -r * 0.4);
+      ctx.lineTo(-r * 0.18, -r * 0.18);
+      ctx.lineTo(0, -r * 0.5);
+      ctx.lineTo(r * 0.18, -r * 0.18);
+      ctx.lineTo(r * 0.42, -r * 0.4);
+      ctx.lineTo(r * 0.38, 0);
       ctx.closePath();
-      ctx.fillStyle = toCss(parseColor('#f5c542')); ctx.fill();
-      ctx.strokeStyle = toCss(parseColor('#b8860b')); ctx.stroke();
-      ctx.fillStyle = toCss(tint); ellipse(ctx, 0, -r * 0.14, r * 0.07, r * 0.07); ctx.fill();
+      ctx.fillStyle = toCss(parseColor('#f5c542'));
+      ctx.fill();
+      ctx.strokeStyle = toCss(parseColor('#b8860b'));
+      ctx.stroke();
+      ctx.fillStyle = toCss(tint);
+      ellipse(ctx, 0, -r * 0.14, r * 0.07, r * 0.07);
+      ctx.fill();
       break;
     }
     case 'propeller': {
       ctx.translate(0, top + r * 0.3);
-      ctx.beginPath(); ctx.ellipse(0, 0, r * 0.55, r * 0.36, 0, Math.PI, TAU); ctx.closePath();
-      ctx.fillStyle = toCss(tint); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, -r * 0.36); ctx.lineTo(0, -r * 0.55); ctx.stroke();
-      const spin = (p.spin || 0);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 0.55, r * 0.36, 0, Math.PI, TAU);
+      ctx.closePath();
+      ctx.fillStyle = toCss(tint);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 0.36);
+      ctx.lineTo(0, -r * 0.55);
+      ctx.stroke();
+      const spin = p.spin || 0;
       const w = Math.cos(spin) * r * 0.5;
       ctx.fillStyle = toCss(light);
-      ellipse(ctx, w / 2, -r * 0.58, Math.abs(w) / 2 + 0.5, r * 0.07); ctx.fill();
-      ellipse(ctx, -w / 2, -r * 0.58, Math.abs(w) / 2 + 0.5, r * 0.07); ctx.fill();
-      ctx.fillStyle = toCss(dark); ellipse(ctx, 0, -r * 0.58, r * 0.06, r * 0.06); ctx.fill();
+      ellipse(ctx, w / 2, -r * 0.58, Math.abs(w) / 2 + 0.5, r * 0.07);
+      ctx.fill();
+      ellipse(ctx, -w / 2, -r * 0.58, Math.abs(w) / 2 + 0.5, r * 0.07);
+      ctx.fill();
+      ctx.fillStyle = toCss(dark);
+      ellipse(ctx, 0, -r * 0.58, r * 0.06, r * 0.06);
+      ctx.fill();
       break;
     }
     case 'headphones': {
       ctx.lineWidth = r * 0.12;
-      ctx.beginPath(); ctx.arc(0, -r, r * 1.04, 1.1 * Math.PI, 1.9 * Math.PI); ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, -r, r * 1.04, 1.1 * Math.PI, 1.9 * Math.PI);
+      ctx.stroke();
       ctx.fillStyle = toCss(tint);
       for (const s of [-1, 1]) {
         ctx.lineWidth = Math.max(1, r * 0.05);
         roundRect(ctx, s * r * 0.98 - r * 0.14, -r * 1.25, r * 0.28, r * 0.42, r * 0.1);
-        ctx.fill(); ctx.stroke();
+        ctx.fill();
+        ctx.stroke();
       }
       break;
     }
@@ -563,10 +726,13 @@ export function drawBubble(ctx, x, y, text, pal, color, scale = 1) {
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(scale, scale);
-  const w = 18, h = 20;
+  const w = 18,
+    h = 20;
   const fill = pal.dark ? lighten(pal['surface-2'], 0.1) : WHITE;
   ctx.beginPath();
-  ctx.moveTo(-3, -6); ctx.lineTo(0, 0); ctx.lineTo(4, -6);
+  ctx.moveTo(-3, -6);
+  ctx.lineTo(0, 0);
+  ctx.lineTo(4, -6);
   roundRect(ctx, -w / 2, -h - 5, w, h, 7);
   ctx.fillStyle = toCss(fill);
   ctx.strokeStyle = toCss(color);
@@ -577,9 +743,12 @@ export function drawBubble(ctx, x, y, text, pal, color, scale = 1) {
   ctx.arcTo(-w / 2, -h - 5, w / 2, -h - 5, 7);
   ctx.arcTo(w / 2, -h - 5, w / 2, -5, 7);
   ctx.arcTo(w / 2, -5, -w / 2, -5, 7);
-  ctx.lineTo(3, -5); ctx.lineTo(0, 1); ctx.lineTo(-3, -5);
+  ctx.lineTo(3, -5);
+  ctx.lineTo(0, 1);
+  ctx.lineTo(-3, -5);
   ctx.closePath();
-  ctx.fill(); ctx.stroke();
+  ctx.fill();
+  ctx.stroke();
   ctx.fillStyle = toCss(darken(color, 0.25));
   ctx.font = '800 14px system-ui, -apple-system, Segoe UI, sans-serif';
   ctx.textAlign = 'center';
@@ -594,7 +763,13 @@ export function drawThinkingDots(ctx, x, y, r, t, color) {
     const a = t * 2.2 + (i * TAU) / 3;
     const depth = (Math.sin(a) + 1) / 2;
     ctx.fillStyle = toCss(color, 0.45 + 0.55 * depth);
-    ellipse(ctx, x + Math.cos(a) * r * 0.85, y + Math.sin(a) * r * 0.22, r * (0.09 + 0.05 * depth), r * (0.09 + 0.05 * depth));
+    ellipse(
+      ctx,
+      x + Math.cos(a) * r * 0.85,
+      y + Math.sin(a) * r * 0.22,
+      r * (0.09 + 0.05 * depth),
+      r * (0.09 + 0.05 * depth),
+    );
     ctx.fill();
   }
 }
@@ -639,46 +814,89 @@ export function drawProjectile(ctx, kind, x, y, angle, t, pal, s = 1) {
   ctx.fillStyle = toCss(col);
   switch (kind) {
     case 'git': {
-      ellipse(ctx, 0, 0, 4.5, 4.5); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = toCss(lighten(col, 0.7)); ellipse(ctx, 0, 0, 1.8, 1.8); ctx.fill();
+      ellipse(ctx, 0, 0, 4.5, 4.5);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = toCss(lighten(col, 0.7));
+      ellipse(ctx, 0, 0, 1.8, 1.8);
+      ctx.fill();
       break;
     }
     case 'pr': {
       ctx.rotate(angle);
       ctx.fillStyle = toCss(pal.dark ? lighten(col, 0.6) : WHITE);
       ctx.strokeStyle = toCss(darken(col, 0.2));
-      ctx.beginPath(); ctx.moveTo(9, 0); ctx.lineTo(-7, -6); ctx.lineTo(-3, 0); ctx.lineTo(-7, 6); ctx.closePath();
-      ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(9, 0); ctx.lineTo(-3, 0); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(9, 0);
+      ctx.lineTo(-7, -6);
+      ctx.lineTo(-3, 0);
+      ctx.lineTo(-7, 6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(9, 0);
+      ctx.lineTo(-3, 0);
+      ctx.stroke();
       break;
     }
     case 'jira': {
       ctx.rotate(Math.sin(t * 9) * 0.5);
-      roundRect(ctx, -7, -4.5, 14, 9, 2); ctx.fill(); ctx.stroke();
-      ctx.strokeStyle = toCss(lighten(col, 0.7)); ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(-3, -1.5); ctx.lineTo(4, -1.5); ctx.moveTo(-3, 1.5); ctx.lineTo(2, 1.5); ctx.stroke();
+      roundRect(ctx, -7, -4.5, 14, 9, 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = toCss(lighten(col, 0.7));
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-3, -1.5);
+      ctx.lineTo(4, -1.5);
+      ctx.moveTo(-3, 1.5);
+      ctx.lineTo(2, 1.5);
+      ctx.stroke();
       break;
     }
     case 'terminal': {
       ctx.rotate(t * 12);
       drawStar(ctx, 0, 0, 5.5, 0, lighten(col, 0.2));
-      ctx.fillStyle = toCss(WHITE, 0.9); ellipse(ctx, 0, 0, 1.8, 1.8); ctx.fill();
+      ctx.fillStyle = toCss(WHITE, 0.9);
+      ellipse(ctx, 0, 0, 1.8, 1.8);
+      ctx.fill();
       break;
     }
     case 'files': {
       ctx.rotate(t * 7);
-      ctx.fillStyle = toCss(col); ctx.strokeStyle = toCss(mix(col, pal.fg, 0.5), 0.8);
-      ctx.fillRect(-4, -5, 8, 10); ctx.strokeRect(-4, -5, 8, 10);
-      ctx.beginPath(); ctx.moveTo(-2, -2); ctx.lineTo(2, -2); ctx.moveTo(-2, 0.5); ctx.lineTo(2, 0.5); ctx.stroke();
+      ctx.fillStyle = toCss(col);
+      ctx.strokeStyle = toCss(mix(col, pal.fg, 0.5), 0.8);
+      ctx.fillRect(-4, -5, 8, 10);
+      ctx.strokeRect(-4, -5, 8, 10);
+      ctx.beginPath();
+      ctx.moveTo(-2, -2);
+      ctx.lineTo(2, -2);
+      ctx.moveTo(-2, 0.5);
+      ctx.lineTo(2, 0.5);
+      ctx.stroke();
       break;
     }
     case 'web': {
       ctx.rotate(Math.sin(t * 4) * 0.2);
-      ctx.strokeStyle = toCss(mix(pal.fg, pal.bg, 0.3), 0.8); ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(0, 7); ctx.quadraticCurveTo(-3, 11, 0, 15); ctx.stroke();
-      ctx.fillStyle = toCss(col); ellipse(ctx, 0, 0, 6, 7.5); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(-1.5, 7.5); ctx.lineTo(1.5, 7.5); ctx.lineTo(0, 5.5); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = toCss(WHITE, 0.6); ellipse(ctx, -2, -3, 1.6, 2.4, -0.4); ctx.fill();
+      ctx.strokeStyle = toCss(mix(pal.fg, pal.bg, 0.3), 0.8);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, 7);
+      ctx.quadraticCurveTo(-3, 11, 0, 15);
+      ctx.stroke();
+      ctx.fillStyle = toCss(col);
+      ellipse(ctx, 0, 0, 6, 7.5);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-1.5, 7.5);
+      ctx.lineTo(1.5, 7.5);
+      ctx.lineTo(0, 5.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = toCss(WHITE, 0.6);
+      ellipse(ctx, -2, -3, 1.6, 2.4, -0.4);
+      ctx.fill();
       break;
     }
     case 'human': {
@@ -688,18 +906,29 @@ export function drawProjectile(ctx, kind, x, y, angle, t, pal, s = 1) {
       ctx.moveTo(0, 5);
       ctx.bezierCurveTo(-8, -1, -4, -8, 0, -3);
       ctx.bezierCurveTo(4, -8, 8, -1, 0, 5);
-      ctx.fill(); ctx.stroke();
+      ctx.fill();
+      ctx.stroke();
       break;
     }
     default: {
-      ellipse(ctx, 0, 0, 4, 4); ctx.fill();
+      ellipse(ctx, 0, 0, 4, 4);
+      ctx.fill();
     }
   }
   ctx.restore();
 }
 
 /** Text with a background-coloured halo so it reads over anything. */
-export function haloText(ctx, text, x, y, pal, alpha = 1, font = '600 11px system-ui, -apple-system, Segoe UI, sans-serif', color = pal.fg) {
+export function haloText(
+  ctx,
+  text,
+  x,
+  y,
+  pal,
+  alpha = 1,
+  font = '600 11px system-ui, -apple-system, Segoe UI, sans-serif',
+  color = pal.fg,
+) {
   ctx.font = font;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';

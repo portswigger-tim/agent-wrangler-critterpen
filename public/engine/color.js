@@ -10,12 +10,24 @@ const ALIASES = { yellow: 'warn' };
 
 export const FALLBACKS = {
   light: {
-    green: '#3fb950', blue: '#4c8dff', yellow: '#f2b01e', red: '#ef5350',
-    'surface-2': '#c9ced6', fg: '#1f2328', bg: '#f6f7f9', accent: '#a371f7',
+    green: '#3fb950',
+    blue: '#4c8dff',
+    yellow: '#f2b01e',
+    red: '#ef5350',
+    'surface-2': '#c9ced6',
+    fg: '#1f2328',
+    bg: '#f6f7f9',
+    accent: '#a371f7',
   },
   dark: {
-    green: '#56d364', blue: '#6ca7ff', yellow: '#f5c542', red: '#ff6b6b',
-    'surface-2': '#3a414b', fg: '#e6edf3', bg: '#14171c', accent: '#bc8cff',
+    green: '#56d364',
+    blue: '#6ca7ff',
+    yellow: '#f5c542',
+    red: '#ff6b6b',
+    'surface-2': '#3a414b',
+    fg: '#e6edf3',
+    bg: '#14171c',
+    accent: '#bc8cff',
   },
 };
 
@@ -37,7 +49,9 @@ export function parseColor(str) {
     }
     if (h.length === 6 || h.length === 8) {
       return {
-        r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16),
+        r: parseInt(h.slice(0, 2), 16),
+        g: parseInt(h.slice(2, 4), 16),
+        b: parseInt(h.slice(4, 6), 16),
         a: h.length === 8 ? parseInt(h.slice(6, 8), 16) / 255 : 1,
       };
     }
@@ -71,14 +85,15 @@ export const darken = (c, t) => mix(c, BLACK, t);
 export function luminance(c) {
   const f = (v) => {
     v /= 255;
-    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
   };
   return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b);
 }
 
 /** WCAG contrast ratio, 1..21. */
 export function contrast(a, b) {
-  const la = luminance(a), lb = luminance(b);
+  const la = luminance(a),
+    lb = luminance(b);
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
@@ -142,12 +157,11 @@ function rasterise(css) {
 export function readTheme(el, theme = 'auto') {
   const cs = getComputedStyle(el);
   const raw = {};
-  for (const k of TOKENS) raw[k] = cs.getPropertyValue('--' + k) || cs.getPropertyValue('--' + (ALIASES[k] || k));
+  for (const k of TOKENS) raw[k] = cs.getPropertyValue(`--${k}`) || cs.getPropertyValue(`--${ALIASES[k] || k}`);
   let mode = theme;
   if (mode === 'auto') {
     const bg = raw.bg && (parseColor(raw.bg) || rasterise(raw.bg));
-    mode = bg ? (isDark(bg) ? 'dark' : 'light')
-      : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    mode = bg ? (isDark(bg) ? 'dark' : 'light') : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
   const pal = resolvePalette(raw, /** @type {'light'|'dark'} */ (mode), rasterise);
   return { ...pal, dark: isDark(pal.bg) };
@@ -155,8 +169,13 @@ export function readTheme(el, theme = 'auto') {
 
 /** RGBA → { h: 0..360, s: 0..1, l: 0..1, a }. */
 export function rgbToHsl(c) {
-  const r = c.r / 255, g = c.g / 255, b = c.b / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min;
+  const r = c.r / 255,
+    g = c.g / 255,
+    b = c.b / 255;
+  const max = Math.max(r, g, b),
+    min = Math.min(r, g, b),
+    l = (max + min) / 2,
+    d = max - min;
   if (d === 0) return { h: 0, s: 0, l, a: c.a };
   const s = d / (1 - Math.abs(2 * l - 1));
   let h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
@@ -218,13 +237,20 @@ const restGrey = (pal) => (pal.dark ? mix(pal['surface-2'], pal.fg, 0.42) : mix(
 export function statusColor(status, pal) {
   const dark = !!pal.dark;
   switch (status) {
-    case 'working': return pastel(pal.green, dark);
-    case 'thinking': return pastel(pal.blue, dark);
-    case 'needs-you': return pastel(pal.yellow, dark);
-    case 'error': return pastel(pal.red, dark);
-    case 'archived': return ensureContrast(mix(pal['surface-2'], pal.bg, 0.25), pal.bg, 1.3);
-    case 'finished': return pastel(mix(restGrey(pal), pal.accent, 0.55), dark);
-    case 'asleep': return ensureContrast(mix(restGrey(pal), pal.blue, 0.1), pal.bg, dark ? 2.2 : 1.3);
+    case 'working':
+      return pastel(pal.green, dark);
+    case 'thinking':
+      return pastel(pal.blue, dark);
+    case 'needs-you':
+      return pastel(pal.yellow, dark);
+    case 'error':
+      return pastel(pal.red, dark);
+    case 'archived':
+      return ensureContrast(mix(pal['surface-2'], pal.bg, 0.25), pal.bg, 1.3);
+    case 'finished':
+      return pastel(mix(restGrey(pal), pal.accent, 0.55), dark);
+    case 'asleep':
+      return ensureContrast(mix(restGrey(pal), pal.blue, 0.1), pal.bg, dark ? 2.2 : 1.3);
     default: {
       // Awake idle: the same soft grey, a touch lighter and warmer than asleep.
       const awake = dark ? mix(restGrey(pal), pal.fg, 0.12) : mix(restGrey(pal), pal.bg, 0.12);

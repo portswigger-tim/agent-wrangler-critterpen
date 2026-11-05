@@ -15,7 +15,8 @@ test('hash32 is deterministic, unsigned and spreads similar ids', () => {
 });
 
 test('rng is seeded and stays in [0, 1)', () => {
-  const a = rng(42), b = rng(42);
+  const a = rng(42),
+    b = rng(42);
   const xs = Array.from({ length: 100 }, a);
   assert.deepEqual(xs, Array.from({ length: 100 }, b));
   assert.ok(xs.every((x) => x >= 0 && x < 1));
@@ -49,7 +50,8 @@ test('truncateToWidth adds an ellipsis only when needed', () => {
 });
 
 test('quad hits endpoints and arcControl lifts above both ends', () => {
-  const a = { x: 0, y: 100 }, b = { x: 200, y: 50 };
+  const a = { x: 0, y: 100 },
+    b = { x: 200, y: 50 };
   const c = arcControl(a, b);
   assert.ok(c.y < 50);
   assert.deepEqual(quad(a, c, b, 0), a);
@@ -66,18 +68,32 @@ const HATS = 10;
 const hex = (r, n) => Array.from({ length: n }, () => Math.floor(r() * 16).toString(16)).join('');
 const uuid = (r) => `${hex(r, 8)}-${hex(r, 4)}-4${hex(r, 3)}-8${hex(r, 3)}-${hex(r, 12)}`;
 const FAMILIES = {
-  'random uuids': (() => { const r = rng(7); return () => uuid(r); })(),
-  'shared prefix': (() => { let i = 0; return () => `6abf2ad4-fc55-4f49-8bbf-${(i++).toString(16).padStart(12, '0')}`; })(),
-  'shared suffix': (() => { let i = 0; return () => `${(i++).toString(16).padStart(8, '0')}-fc55-4f49-8bbf-ad039ef2ea13`; })(),
-  'sequential short ids': (() => { let i = 0; return () => `s-${i++}`; })(),
+  'random uuids': (() => {
+    const r = rng(7);
+    return () => uuid(r);
+  })(),
+  'shared prefix': (() => {
+    let i = 0;
+    return () => `6abf2ad4-fc55-4f49-8bbf-${(i++).toString(16).padStart(12, '0')}`;
+  })(),
+  'shared suffix': (() => {
+    let i = 0;
+    return () => `${(i++).toString(16).padStart(8, '0')}-fc55-4f49-8bbf-ad039ef2ea13`;
+  })(),
+  'sequential short ids': (() => {
+    let i = 0;
+    return () => `s-${i++}`;
+  })(),
 };
 // Chi-square critical values at p = 0.001.
-const CHI2_DF9 = 27.88, CHI2_DF81 = 124.84;
+const CHI2_DF9 = 27.88,
+  CHI2_DF81 = 124.84;
 const chi2 = (counts, expected) => counts.reduce((s, c) => s + (c - expected) ** 2 / expected, 0);
 
 for (const [name, next] of Object.entries(FAMILIES)) {
   test(`accessories spread evenly across ${name}`, () => {
-    const n = 5000, buckets = Array(HATS).fill(0);
+    const n = 5000,
+      buckets = Array(HATS).fill(0);
     for (let i = 0; i < n; i++) buckets[critterTraits(next(), HATS).accessory]++;
     const x = chi2(buckets, n / HATS);
     assert.ok(x < CHI2_DF9, `chi2=${x.toFixed(1)} buckets=${buckets.join(',')}`);
@@ -85,7 +101,9 @@ for (const [name, next] of Object.entries(FAMILIES)) {
 }
 
 test('sharing a hat says nothing about the tint hue', () => {
-  const r = rng(11), n = 10000, table = Array.from({ length: HATS }, () => Array(HATS).fill(0));
+  const r = rng(11),
+    n = 10000,
+    table = Array.from({ length: HATS }, () => Array(HATS).fill(0));
   for (let i = 0; i < n; i++) {
     const t = critterTraits(uuid(r), HATS);
     table[t.accessory][Math.floor(t.hue / 36)]++;
@@ -96,7 +114,8 @@ test('sharing a hat says nothing about the tint hue', () => {
 });
 
 test('hash32 collisions stay near the birthday bound', () => {
-  const r = rng(3), seen = new Set();
+  const r = rng(3),
+    seen = new Set();
   let coll = 0;
   for (let i = 0; i < 50000; i++) {
     const h = hash32(uuid(r));

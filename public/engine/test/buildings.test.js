@@ -1,18 +1,32 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ISLET_KINDS, UNIT, buildingFootprint, isletFootprint, isletBob, hitPose, bellQueueSlots,
-  buildingColor, drawServiceBuilding, drawCarrier, drawIslet, drawCaptionPlank,
+  ISLET_KINDS,
+  UNIT,
+  buildingFootprint,
+  isletFootprint,
+  isletBob,
+  hitPose,
+  bellQueueSlots,
+  buildingColor,
+  drawServiceBuilding,
+  drawCarrier,
+  drawIslet,
+  drawCaptionPlank,
 } from '../buildings.js';
 import { LANDMARK_KINDS } from '../contract.js';
 import { resolvePalette, isDark, rgbToHsl, hueDistance } from '../color.js';
 import { kindColor } from '../art.js';
 
-const palFor = (mode) => { const p = resolvePalette({}, mode); return { ...p, dark: isDark(p.bg) }; };
+const palFor = (mode) => {
+  const p = resolvePalette({}, mode);
+  return { ...p, dark: isDark(p.bg) };
+};
 
 /** A recording 2D context that also checks save/restore stay balanced. */
 function recordingCtx() {
-  let depth = 0, minDepth = 0;
+  let depth = 0,
+    minDepth = 0;
   const calls = [];
   const grad = { addColorStop() {} };
   const target = {};
@@ -21,13 +35,35 @@ function recordingCtx() {
       if (k in t) return t[k];
       if (k === 'createRadialGradient' || k === 'createLinearGradient') return () => grad;
       if (k === 'measureText') return (s) => ({ width: String(s).length * 6 });
-      if (k === 'save') return () => { depth++; calls.push('save'); };
-      if (k === 'restore') return () => { depth--; minDepth = Math.min(minDepth, depth); calls.push('restore'); };
-      return (...a) => calls.push(String(k) + '(' + a.map((v) => (typeof v === 'number' ? v.toFixed(2) : '')).join(',') + ')');
+      if (k === 'save')
+        return () => {
+          depth++;
+          calls.push('save');
+        };
+      if (k === 'restore')
+        return () => {
+          depth--;
+          minDepth = Math.min(minDepth, depth);
+          calls.push('restore');
+        };
+      return (...a) =>
+        calls.push(`${String(k)}(${a.map((v) => (typeof v === 'number' ? v.toFixed(2) : '')).join(',')})`);
     },
-    set(t, k, v) { t[k] = v; return true; },
+    set(t, k, v) {
+      t[k] = v;
+      return true;
+    },
   });
-  return { ctx, calls, get depth() { return depth; }, get minDepth() { return minDepth; } };
+  return {
+    ctx,
+    calls,
+    get depth() {
+      return depth;
+    },
+    get minDepth() {
+      return minDepth;
+    },
+  };
 }
 
 test('there is a building for every landmark kind', () => {
@@ -82,7 +118,11 @@ test('hitPose: rest at 0, flag up during a hit and down again at the end', () =>
 });
 
 test('bell queue: four either side, nearest first, no bodies overlapping each other or the bell', () => {
-  for (const [scale, r] of [[1, 18], [0.7, 12.6], [1.3, 23.4]]) {
+  for (const [scale, r] of [
+    [1, 18],
+    [0.7, 12.6],
+    [1.3, 23.4],
+  ]) {
     const slots = bellQueueSlots(scale, r);
     assert.equal(slots.length, 8);
     assert.equal(slots.filter((s) => s.side > 0).length, 4);
@@ -99,7 +139,10 @@ test('bell queue: four either side, nearest first, no bodies overlapping each ot
     // Nearest first on each side.
     for (const side of [1, -1]) {
       const xs = slots.filter((s) => s.side === side).map((s) => Math.abs(s.dx));
-      assert.deepEqual(xs, [...xs].sort((a, b) => a - b));
+      assert.deepEqual(
+        xs,
+        [...xs].sort((a, b) => a - b),
+      );
     }
     // They fit on the bell islet.
     const f = isletFootprint('human', scale);
@@ -111,7 +154,8 @@ test('building colours come from the theme kind colours, softened', () => {
   for (const mode of ['dark', 'light']) {
     const pal = palFor(mode);
     for (const kind of ISLET_KINDS) {
-      const raw = rgbToHsl(kindColor(kind, pal)), soft = rgbToHsl(buildingColor(kind, pal));
+      const raw = rgbToHsl(kindColor(kind, pal)),
+        soft = rgbToHsl(buildingColor(kind, pal));
       if (raw.s > 0.2) assert.ok(hueDistance(raw.h, soft.h) < 1, `${mode} ${kind}`);
     }
   }
@@ -129,7 +173,10 @@ test('every building, carrier and caption draws in both themes with save/restore
         drawIslet(r.ctx, kind, 100, 200, 0.8, pal, 3.2, { hit, waiting: 0.5, caption: kind });
         assert.equal(r.depth, 0, `${mode} ${kind} hit=${hit}: save/restore balanced`);
         assert.ok(r.minDepth >= 0, 'never restores more than it saved');
-        assert.ok(r.calls.some((c) => c.startsWith('fill(')), 'drew something');
+        assert.ok(
+          r.calls.some((c) => c.startsWith('fill(')),
+          'drew something',
+        );
       }
     }
   }
@@ -138,7 +185,11 @@ test('every building, carrier and caption draws in both themes with save/restore
 test('reduced motion: a building looks the same at any time and ignores hits', () => {
   const pal = palFor('dark');
   for (const kind of ISLET_KINDS) {
-    const at = (t, hit) => { const r = recordingCtx(); drawIslet(r.ctx, kind, 100, 200, 1, pal, t, { hit, reduced: true }); return r.calls.join(';'); };
+    const at = (t, hit) => {
+      const r = recordingCtx();
+      drawIslet(r.ctx, kind, 100, 200, 1, pal, t, { hit, reduced: true });
+      return r.calls.join(';');
+    };
     assert.equal(at(0, 0), at(42, 0.8), kind);
   }
 });
@@ -159,10 +210,14 @@ test('phone box: double-ring cadence, pure and periodic', async () => {
 
 test('phone box: the front of the queue holds the receiver, beside the box door', async () => {
   const { PHONE_HOLDER_SLOT, phoneSocket, receiverSpot } = await import('../buildings.js');
-  for (const [scale, r] of [[1, 18], [0.7, 12.6]]) {
+  for (const [scale, r] of [
+    [1, 18],
+    [0.7, 12.6],
+  ]) {
     const slots = bellQueueSlots(scale, r);
     const front = slots[PHONE_HOLDER_SLOT];
-    for (const s of slots.filter((x) => x.side === front.side)) assert.ok(Math.abs(s.dx) >= Math.abs(front.dx), 'holder is nearest the box');
+    for (const s of slots.filter((x) => x.side === front.side))
+      assert.ok(Math.abs(s.dx) >= Math.abs(front.dx), 'holder is nearest the box');
     const sock = phoneSocket(scale);
     assert.ok(sock.dx > 0 && sock.dy < 0, 'socket on the door side, up the box');
     const rs = receiverSpot(r, front.side);
@@ -182,7 +237,11 @@ test('phone box keeps the bell footprint, so placement is unchanged', () => {
 
 test('phone box under reduced motion: ring arcs show while anyone waits, and hold still', () => {
   const pal = palFor('light');
-  const arcs = (o, t = 0) => { const r = recordingCtx(); drawServiceBuilding(r.ctx, 'human', 100, 200, 1, pal, t, o); return r.calls.filter((c) => c.startsWith('arc(')); };
+  const arcs = (o, t = 0) => {
+    const r = recordingCtx();
+    drawServiceBuilding(r.ctx, 'human', 100, 200, 1, pal, t, o);
+    return r.calls.filter((c) => c.startsWith('arc('));
+  };
   assert.ok(arcs({ reduced: true, waiting: 1 }).length >= 4, 'arcs while waiting');
   assert.equal(arcs({ reduced: true, waiting: 0 }).length, 0, 'none when nobody waits');
   assert.deepEqual(arcs({ reduced: true, waiting: 1 }, 0), arcs({ reduced: true, waiting: 1 }, 7.3), 'no motion');
@@ -193,8 +252,13 @@ test('phone box red: warm pillar-box red, clearly apart from the error status', 
   const { statusColor, contrast } = await import('../color.js');
   for (const mode of ['dark', 'light']) {
     const pal = palFor(mode);
-    const box = rgbToHsl(phoneRed(pal)), err = rgbToHsl(statusColor('error', pal)), red = rgbToHsl(pal.red);
-    assert.ok(hueDistance(box.h, red.h) >= 5 && hueDistance(box.h, red.h) <= 12, `${mode}: warmer than --red but still red (${box.h.toFixed(1)} vs ${red.h.toFixed(1)})`);
+    const box = rgbToHsl(phoneRed(pal)),
+      err = rgbToHsl(statusColor('error', pal)),
+      red = rgbToHsl(pal.red);
+    assert.ok(
+      hueDistance(box.h, red.h) >= 5 && hueDistance(box.h, red.h) <= 12,
+      `${mode}: warmer than --red but still red (${box.h.toFixed(1)} vs ${red.h.toFixed(1)})`,
+    );
     assert.ok(box.h > red.h || red.h > 300, `${mode}: shifted toward orange, not pink`);
     assert.ok(err.l - box.l >= 0.08, `${mode}: deeper than the error critter`);
     assert.ok(box.s >= 0.65, `${mode}: rich, not salmon`);

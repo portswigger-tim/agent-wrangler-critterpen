@@ -1,8 +1,21 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  parseColor, mix, contrast, ensureContrast, resolvePalette, isDark, toCss, TOKENS,
-  rgbToHsl, hslToRgb, hueDistance, pastel, inkFor, statusColor, luminance,
+  parseColor,
+  mix,
+  contrast,
+  ensureContrast,
+  resolvePalette,
+  isDark,
+  toCss,
+  TOKENS,
+  rgbToHsl,
+  hslToRgb,
+  hueDistance,
+  pastel,
+  inkFor,
+  statusColor,
+  luminance,
 } from '../color.js';
 
 test('parseColor handles hex and rgb forms', () => {
@@ -35,7 +48,9 @@ test('ensureContrast pushes grey away from a similar background', () => {
 });
 
 test('resolvePalette falls back per token and uses the resolver', () => {
-  const pal = resolvePalette({ green: '#00ff00', blue: 'weird()', bg: '' }, 'dark', (css) => (css === 'weird()' ? { r: 1, g: 2, b: 3, a: 1 } : null));
+  const pal = resolvePalette({ green: '#00ff00', blue: 'weird()', bg: '' }, 'dark', (css) =>
+    css === 'weird()' ? { r: 1, g: 2, b: 3, a: 1 } : null,
+  );
   assert.deepEqual(pal.green, { r: 0, g: 255, b: 0, a: 1 });
   assert.deepEqual(pal.blue, { r: 1, g: 2, b: 3, a: 1 });
   assert.ok(isDark(pal.bg), 'dark fallback bg');
@@ -59,8 +74,10 @@ test('rgbToHsl and hslToRgb round-trip', () => {
 test('pastel keeps the hue, softens saturation and stays in a lightness band', () => {
   for (const dark of [true, false]) {
     for (const hex of ['#56d364', '#2fa84f', '#6ca7ff', '#3b7ddd', '#f5c542', '#e9a514', '#ff6b6b', '#e5484d']) {
-      const c = parseColor(hex), p = pastel(c, dark);
-      const a = rgbToHsl(c), b = rgbToHsl(p);
+      const c = parseColor(hex),
+        p = pastel(c, dark);
+      const a = rgbToHsl(c),
+        b = rgbToHsl(p);
       assert.ok(hueDistance(a.h, b.h) < 1, `${hex} hue kept`);
       assert.ok(b.s <= Math.max(a.s, 0.35) + 1e-9, `${hex} no more saturated`);
       const [lo, hi] = dark ? [0.64, 0.8] : [0.58, 0.72];
@@ -73,7 +90,8 @@ test('pastel keeps the hue, softens saturation and stays in a lightness band', (
 
 test('inkFor is a darker cousin of the body colour', () => {
   for (const hex of ['#77cd81', '#7ba6e6', '#e2c065', '#e67a7a', '#808c9d']) {
-    const c = parseColor(hex), ink = inkFor(c);
+    const c = parseColor(hex),
+      ink = inkFor(c);
     assert.ok(luminance(ink) < luminance(c) * 0.6, hex);
     assert.ok(hueDistance(rgbToHsl(ink).h, rgbToHsl(c).h) <= 12.5, `${hex} hue stays close`);
   }
@@ -85,13 +103,20 @@ test('status colours stay distinct and come from the theme tokens', () => {
     pal.dark = isDark(pal.bg);
     const hue = (s) => rgbToHsl(statusColor(s, pal)).h;
     const tokenHue = (k) => rgbToHsl(pal[k]).h;
-    for (const [status, token] of [['working', 'green'], ['thinking', 'blue'], ['needs-you', 'yellow'], ['error', 'red']]) {
+    for (const [status, token] of [
+      ['working', 'green'],
+      ['thinking', 'blue'],
+      ['needs-you', 'yellow'],
+      ['error', 'red'],
+    ]) {
       assert.ok(hueDistance(hue(status), tokenHue(token)) < 1, `${mode} ${status} keeps --${token}'s hue`);
     }
     const loud = ['working', 'thinking', 'needs-you', 'error', 'finished'];
-    for (const a of loud) for (const b of loud) if (a < b) assert.ok(hueDistance(hue(a), hue(b)) > 25, `${mode} ${a} vs ${b}`);
+    for (const a of loud)
+      for (const b of loud) if (a < b) assert.ok(hueDistance(hue(a), hue(b)) > 25, `${mode} ${a} vs ${b}`);
     for (const s of ['idle', 'asleep']) assert.ok(rgbToHsl(statusColor(s, pal)).s < 0.35, `${mode} ${s} reads grey`);
-    for (const s of ['working', 'thinking', 'error', 'idle', 'asleep']) assert.ok(contrast(statusColor(s, pal), pal.bg) >= 1.3, `${mode} ${s} visible on the floor`);
+    for (const s of ['working', 'thinking', 'error', 'idle', 'asleep'])
+      assert.ok(contrast(statusColor(s, pal), pal.bg) >= 1.3, `${mode} ${s} visible on the floor`);
     // A theme change flows straight through.
     const custom = { ...pal, green: parseColor('#00aaff') };
     assert.ok(hueDistance(rgbToHsl(statusColor('working', custom)).h, 200) < 1);

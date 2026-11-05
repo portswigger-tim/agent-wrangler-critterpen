@@ -37,7 +37,11 @@ export const UNKNOWN_GRACE_MS = 10_000;
 
 // `storage` is { load() -> string[] | null, save(ids: string[]) }; both may
 // throw or be absent (private mode, blocked storage) and are treated as empty.
-export function createAdapter({ archiveGraceMs = ARCHIVE_GRACE_MS, unknownGraceMs = UNKNOWN_GRACE_MS, storage = null } = {}) {
+export function createAdapter({
+  archiveGraceMs = ARCHIVE_GRACE_MS,
+  unknownGraceMs = UNKNOWN_GRACE_MS,
+  storage = null,
+} = {}) {
   let prevSnap = null;
   let prevGraph = null;
   let lastCritters = new Map(); // id -> critter, from the previous tick
@@ -47,7 +51,13 @@ export function createAdapter({ archiveGraceMs = ARCHIVE_GRACE_MS, unknownGraceM
   const dozing = new Set();
   let lastSelected = null;
 
-  const persist = () => { try { storage?.save([...finished]); } catch { /* storage is a convenience */ } };
+  const persist = () => {
+    try {
+      storage?.save([...finished]);
+    } catch {
+      /* storage is a convenience */
+    }
+  };
 
   // Keep `finished` and `dozing` honest against this graph.
   function track(graph, events, now, selectedId) {
@@ -57,12 +67,18 @@ export function createAdapter({ archiveGraceMs = ARCHIVE_GRACE_MS, unknownGraceM
     const byId = new Map(sessions.map((s) => [s.sessionId, s]));
     for (const ev of events) {
       const s = byId.get(ev.critterId);
-      if (ev.kind === 'done' && s && !isDormant(s) && !finished.has(s.sessionId)) { finished.add(s.sessionId); changed.push(s.sessionId); }
+      if (ev.kind === 'done' && s && !isDormant(s) && !finished.has(s.sessionId)) {
+        finished.add(s.sessionId);
+        changed.push(s.sessionId);
+      }
     }
     for (const id of [...finished]) {
       const s = byId.get(id);
       // Gone from the board, or no longer idle: the result has been superseded.
-      if (!s || s.status === 'working' || s.status === 'needs-you') { finished.delete(id); changed.push(id); }
+      if (!s || s.status === 'working' || s.status === 'needs-you') {
+        finished.delete(id);
+        changed.push(id);
+      }
     }
     // Selecting a card on the board is looking at it — but only the moment the
     // selection moves there, not for as long as it stays put while the human is
@@ -74,11 +90,15 @@ export function createAdapter({ archiveGraceMs = ARCHIVE_GRACE_MS, unknownGraceM
     for (const id of [...dozing]) if (!byId.has(id)) dozing.delete(id);
     for (const s of sessions) {
       const last = typeof s.lastActivity === 'number' ? s.lastActivity : null;
-      if (s.status !== 'idle' || isDormant(s)) { dozing.delete(s.sessionId); continue; }
+      if (s.status !== 'idle' || isDormant(s)) {
+        dozing.delete(s.sessionId);
+        continue;
+      }
       if (last === null) continue; // no reading this tick: keep what we had
       const age = now - last;
-      if (dozing.has(s.sessionId)) { if (age < WAKE_WITHIN_MS) dozing.delete(s.sessionId); }
-      else if (age > ASLEEP_AFTER_MS) dozing.add(s.sessionId);
+      if (dozing.has(s.sessionId)) {
+        if (age < WAKE_WITHIN_MS) dozing.delete(s.sessionId);
+      } else if (age > ASLEEP_AFTER_MS) dozing.add(s.sessionId);
     }
   }
 
@@ -110,7 +130,8 @@ export function createAdapter({ archiveGraceMs = ARCHIVE_GRACE_MS, unknownGraceM
       }
       const present = new Set(state.critters.map((c) => c.id));
       for (const [id, c] of lastCritters) {
-        if (!present.has(id) && !departing.has(id)) departing.set(id, { critter: { ...c, status: 'archived' }, leftAt: now });
+        if (!present.has(id) && !departing.has(id))
+          departing.set(id, { critter: { ...c, status: 'archived' }, leftAt: now });
       }
       for (const [id, d] of departing) {
         if (present.has(id) || now - d.leftAt >= archiveGraceMs) departing.delete(id);

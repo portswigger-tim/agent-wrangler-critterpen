@@ -1,12 +1,29 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeLayout, landmarkSlots, familyOrder, groupByTask, fitCluster, chooseGrid, spacingFor, COMPACT_HEIGHT } from '../layout.js';
+import {
+  computeLayout,
+  landmarkSlots,
+  familyOrder,
+  groupByTask,
+  fitCluster,
+  chooseGrid,
+  COMPACT_HEIGHT,
+} from '../layout.js';
 import { LANDMARK_KINDS } from '../contract.js';
 
-const crit = (id, taskId, parentId) => ({ id, taskId, taskName: taskId.toUpperCase(), ...(parentId ? { parentId } : {}) });
+const crit = (id, taskId, parentId) => ({
+  id,
+  taskId,
+  taskName: taskId.toUpperCase(),
+  ...(parentId ? { parentId } : {}),
+});
 
 test('every landmark kind gets a slot inside the pen', () => {
-  for (const [w, h] of [[1200, 800], [400, 700], [900, 110]]) {
+  for (const [w, h] of [
+    [1200, 800],
+    [400, 700],
+    [900, 110],
+  ]) {
     const { landmarks, compact } = landmarkSlots(w, h);
     assert.equal(compact, h < COMPACT_HEIGHT);
     assert.deepEqual(landmarks.map((l) => l.kind).sort(), [...LANDMARK_KINDS].sort());
@@ -24,15 +41,32 @@ test('narrow trays stack landmarks into two rows', () => {
 
 test('familyOrder puts children right after their parent and survives cycles', () => {
   const list = [crit('kid', 't', 'mom'), crit('x', 't'), crit('mom', 't'), crit('grandkid', 't', 'kid')];
-  assert.deepEqual(familyOrder(list).map((c) => c.id), ['x', 'mom', 'kid', 'grandkid']);
+  assert.deepEqual(
+    familyOrder(list).map((c) => c.id),
+    ['x', 'mom', 'kid', 'grandkid'],
+  );
   const cyc = [crit('a', 't', 'b'), crit('b', 't', 'a')];
-  assert.deepEqual(familyOrder(cyc).map((c) => c.id).sort(), ['a', 'b']);
-  assert.deepEqual(familyOrder([crit('self', 't', 'self')]).map((c) => c.id), ['self']);
+  assert.deepEqual(
+    familyOrder(cyc)
+      .map((c) => c.id)
+      .sort(),
+    ['a', 'b'],
+  );
+  assert.deepEqual(
+    familyOrder([crit('self', 't', 'self')]).map((c) => c.id),
+    ['self'],
+  );
 });
 
 test('groupByTask keeps first-appearance order', () => {
   const g = groupByTask([crit('a', 't2'), crit('b', 't1'), crit('c', 't2')]);
-  assert.deepEqual(g.map((x) => [x.taskId, x.members.length]), [['t2', 2], ['t1', 1]]);
+  assert.deepEqual(
+    g.map((x) => [x.taskId, x.members.length]),
+    [
+      ['t2', 2],
+      ['t1', 1],
+    ],
+  );
 });
 
 test('fitCluster shrinks critters as the crowd grows', () => {

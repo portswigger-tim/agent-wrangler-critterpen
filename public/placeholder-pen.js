@@ -32,30 +32,38 @@ export function createPen(el) {
         if (!byTask.has(c.taskId)) byTask.set(c.taskId, { name: c.taskName, critters: [] });
         byTask.get(c.taskId).critters.push(c);
       }
-      groups.replaceChildren(...[...byTask.values()].map((t) => {
-        const box = doc.createElement('section');
-        box.className = 'cp-task';
-        const h = doc.createElement('h3');
-        h.textContent = t.name;
-        const ul = doc.createElement('ul');
-        for (const c of t.critters) {
-          const li = doc.createElement('li');
-          li.className = `cp-critter cp-${c.status}`;
-          li.dataset.id = c.id;
-          const dot = doc.createElement('span');
-          dot.className = 'cp-dot';
-          const label = doc.createElement('span');
-          label.className = 'cp-name';
-          label.textContent = c.name;
-          const meta = doc.createElement('span');
-          meta.className = 'cp-meta';
-          meta.textContent = [c.status, c.agent, c.parentId ? `↳ ${names.get(c.parentId) || c.parentId.slice(0, 8)}` : ''].filter(Boolean).join(' · ');
-          li.append(dot, label, meta);
-          ul.append(li);
-        }
-        box.append(h, ul);
-        return box;
-      }));
+      groups.replaceChildren(
+        ...[...byTask.values()].map((t) => {
+          const box = doc.createElement('section');
+          box.className = 'cp-task';
+          const h = doc.createElement('h3');
+          h.textContent = t.name;
+          const ul = doc.createElement('ul');
+          for (const c of t.critters) {
+            const li = doc.createElement('li');
+            li.className = `cp-critter cp-${c.status}`;
+            li.dataset.id = c.id;
+            const dot = doc.createElement('span');
+            dot.className = 'cp-dot';
+            const label = doc.createElement('span');
+            label.className = 'cp-name';
+            label.textContent = c.name;
+            const meta = doc.createElement('span');
+            meta.className = 'cp-meta';
+            meta.textContent = [
+              c.status,
+              c.agent,
+              c.parentId ? `↳ ${names.get(c.parentId) || c.parentId.slice(0, 8)}` : '',
+            ]
+              .filter(Boolean)
+              .join(' · ');
+            li.append(dot, label, meta);
+            ul.append(li);
+          }
+          box.append(h, ul);
+          return box;
+        }),
+      );
     },
     emit(ev) {
       const li = doc.createElement('li');
@@ -72,6 +80,8 @@ export function createPen(el) {
       }
     },
     resize() {},
-    destroy() { root.remove(); },
+    destroy() {
+      root.remove();
+    },
   };
 }

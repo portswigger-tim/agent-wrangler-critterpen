@@ -1,8 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  BEHAVIOURS, AMBIENT_KINDS, GAP_MIN, GAP_MAX, FIRST_MIN, FIRST_MAX,
-  schedule, createMind, behaviourPose, applyBehaviour, envelope, busyFraction,
+  BEHAVIOURS,
+  AMBIENT_KINDS,
+  GAP_MIN,
+  GAP_MAX,
+  FIRST_MIN,
+  FIRST_MAX,
+  schedule,
+  createMind,
+  behaviourPose,
+  applyBehaviour,
+  envelope,
+  busyFraction,
 } from '../behaviour.js';
 import { hash32 } from '../util.js';
 
@@ -12,7 +22,8 @@ const NEAR = ['n1', 'n2'];
 
 test('the same seed and time always give the same behaviour', () => {
   for (const seed of SEEDS) {
-    const a = createMind(seed), b = createMind(seed);
+    const a = createMind(seed),
+      b = createMind(seed);
     const ctx = { status: 'idle', neighbours: NEAR };
     for (let t = 0; t < 300; t += 0.37) assert.deepEqual(a.at(t, ctx), b.at(t, ctx));
   }
@@ -21,7 +32,8 @@ test('the same seed and time always give the same behaviour', () => {
 test('answers do not depend on query order (time can jump back)', () => {
   const seed = SEEDS[0];
   const ctx = { status: 'idle', neighbours: NEAR };
-  const fwd = createMind(seed), jumpy = createMind(seed);
+  const fwd = createMind(seed),
+    jumpy = createMind(seed);
   const times = Array.from({ length: 400 }, (_, i) => i * 0.5);
   const expected = times.map((t) => fwd.at(t, ctx));
   const shuffled = [...times].reverse();
@@ -86,7 +98,8 @@ test('reduced motion switches personality off, including triggered behaviours', 
   for (const seed of SEEDS) {
     const mind = createMind(seed);
     mind.trigger('wave', 10, { targetId: 'kid' });
-    for (let t = 0; t < 600; t += 0.2) assert.equal(mind.at(t, { status: 'idle', reduced: true, neighbours: NEAR }), null);
+    for (let t = 0; t < 600; t += 0.2)
+      assert.equal(mind.at(t, { status: 'idle', reduced: true, neighbours: NEAR }), null);
   }
 });
 
@@ -118,7 +131,18 @@ test('envelope eases in and out and pose deltas vanish at the edges', () => {
 });
 
 test('applyBehaviour layers onto the status pose without mutating it', () => {
-  const pose = Object.freeze({ dx: 1, dy: -2, sx: 1, sy: 1, rot: 0.1, lookX: 0, lookY: 0, eyes: 'closed', mouth: 'small-o', wave: null });
+  const pose = Object.freeze({
+    dx: 1,
+    dy: -2,
+    sx: 1,
+    sy: 1,
+    rot: 0.1,
+    lookX: 0,
+    lookY: 0,
+    eyes: 'closed',
+    mouth: 'small-o',
+    wave: null,
+  });
   assert.equal(applyBehaviour(pose, null, 20), pose);
   const b = { kind: 'chat', age: 1.5, dur: 3.2, k: 1.5 / 3.2, pick: 0.1, target: 'n1' };
   const o = applyBehaviour(pose, b, 20, { x: -1, y: 0 });

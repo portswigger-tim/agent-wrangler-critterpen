@@ -13,7 +13,12 @@
     "label": "Critter Pen",
     "description": "Shows every session as an animated critter whose colour and antics are its status.",
     "author": "PortSwigger",
-    "requires": ["sessions:read", "board:broadcast"],
-    "engines": { "wranglerApi": "^1.35.0" }
+    "requires": [
+      "sessions:read",
+      "board:broadcast"
+    ],
+    "engines": {
+      "wranglerApi": "^1.35.0"
+    }
   }
 }

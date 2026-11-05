@@ -152,8 +152,8 @@ Install the [pre-commit](https://pre-commit.com) hooks once per clone or worktre
 pre-commit install
 ```
 
-Before every commit and every merge commit they run the tests, shellcheck and some
-file hygiene checks (whitespace, line endings, merge markers, large files, private keys).
+Before every commit and every merge commit they run the tests, [Biome](https://biomejs.dev)
+formatting and lint (settings in `biome.json`), shellcheck and some file hygiene checks (whitespace, line endings, merge markers, large files, private keys).
 `pre-commit run --all-files` runs them by hand.
 
 ## Trademarks

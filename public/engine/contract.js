@@ -58,10 +58,30 @@
  */
 
 /** @type {readonly CritterStatus[]} */
-export const STATUSES = Object.freeze(['working', 'thinking', 'needs-you', 'error', 'finished', 'idle', 'asleep', 'archived']);
+export const STATUSES = Object.freeze([
+  'working',
+  'thinking',
+  'needs-you',
+  'error',
+  'finished',
+  'idle',
+  'asleep',
+  'archived',
+]);
 
 /** @type {readonly PenEventKind[]} */
-export const EVENT_KINDS = Object.freeze(['git', 'pr', 'jira', 'terminal', 'files', 'web', 'human', 'spawn', 'done', 'error']);
+export const EVENT_KINDS = Object.freeze([
+  'git',
+  'pr',
+  'jira',
+  'terminal',
+  'files',
+  'web',
+  'human',
+  'spawn',
+  'done',
+  'error',
+]);
 
 /** Event kinds that fire a projectile at a landmark on the pen edge. */
 export const LANDMARK_KINDS = Object.freeze(['git', 'pr', 'jira', 'terminal', 'files', 'web', 'human']);
@@ -89,7 +109,8 @@ export function validateCritter(c, where = 'critter') {
   }
   if (isStr(o.id) && !o.id) errs.push(`${where}.id: must not be empty`);
   if (o.parentId !== undefined && !isStr(o.parentId)) errs.push(`${where}.parentId: expected string or undefined`);
-  if (!isStatus(o.status)) errs.push(`${where}.status: expected one of ${STATUSES.join('|')}, got ${JSON.stringify(o.status)}`);
+  if (!isStatus(o.status))
+    errs.push(`${where}.status: expected one of ${STATUSES.join('|')}, got ${JSON.stringify(o.status)}`);
   return errs;
 }
 
@@ -124,7 +145,8 @@ export function validatePenEvent(ev) {
   const o = /** @type {Record<string, unknown>} */ (ev);
   const errs = [];
   if (!isStr(o.critterId) || !o.critterId) errs.push('event.critterId: expected non-empty string');
-  if (!isEventKind(o.kind)) errs.push(`event.kind: expected one of ${EVENT_KINDS.join('|')}, got ${JSON.stringify(o.kind)}`);
+  if (!isEventKind(o.kind))
+    errs.push(`event.kind: expected one of ${EVENT_KINDS.join('|')}, got ${JSON.stringify(o.kind)}`);
   if (o.label !== undefined && !isStr(o.label)) errs.push('event.label: expected string or undefined');
   return errs;
 }

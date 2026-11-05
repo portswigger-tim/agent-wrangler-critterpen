@@ -65,16 +65,17 @@ export const ease = {
   linear: (t) => t,
   inQuad: (t) => t * t,
   outQuad: (t) => 1 - (1 - t) * (1 - t),
-  inOutCubic: (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2),
-  outCubic: (t) => 1 - Math.pow(1 - t, 3),
+  inOutCubic: (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2),
+  outCubic: (t) => 1 - (1 - t) ** 3,
   inOutSine: (t) => -(Math.cos(Math.PI * t) - 1) / 2,
   outBack: (t) => {
-    const c1 = 1.70158, c3 = c1 + 1;
-    return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+    const c1 = 1.70158,
+      c3 = c1 + 1;
+    return 1 + c3 * (t - 1) ** 3 + c1 * (t - 1) ** 2;
   },
   outElastic: (t) => {
     if (t === 0 || t === 1) return t;
-    return Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * ((2 * Math.PI) / 3)) + 1;
+    return 2 ** (-10 * t) * Math.sin((t * 10 - 0.75) * ((2 * Math.PI) / 3)) + 1;
   },
 };
 
@@ -108,7 +109,8 @@ export function truncateToWidth(text, maxWidth, measure) {
   if (measure(text) <= maxWidth) return text;
   const ell = '…';
   if (measure(ell) > maxWidth) return '';
-  let lo = 0, hi = text.length;
+  let lo = 0,
+    hi = text.length;
   // Binary search on the longest prefix that fits with the ellipsis.
   while (lo < hi) {
     const mid = (lo + hi + 1) >> 1;
@@ -139,11 +141,13 @@ export function truncateMiddle(text, maxWidth, measure) {
   const ell = '…';
   const fits = (t) => measure(t) <= maxWidth;
   const words = text.trim().split(/\s+/);
-  const first = words[0], last = words[words.length - 1];
+  const first = words[0],
+    last = words[words.length - 1];
   if (words.length >= 3) {
     const join = (h, t) => `${words.slice(0, h).join(' ')} ${ell} ${words.slice(words.length - t).join(' ')}`;
     if (fits(join(1, 1))) {
-      let head = 1, tail = 1;
+      let head = 1,
+        tail = 1;
       // Grow from the tail first (it tells sessions apart), always dropping at least one word.
       for (;;) {
         if (head + tail + 1 < words.length && fits(join(head, tail + 1))) tail++;
@@ -163,7 +167,8 @@ export function truncateMiddle(text, maxWidth, measure) {
   // One word left to work with (or the first word alone is too long).
   const w = words.length >= 2 ? first : text.trim();
   for (let n = w.length - 1; n >= 2 * MIN_CUT; n--) {
-    const head = Math.max(MIN_CUT, Math.ceil(n * 0.45)), tail = n - head;
+    const head = Math.max(MIN_CUT, Math.ceil(n * 0.45)),
+      tail = n - head;
     if (tail < MIN_CUT) continue;
     const t = `${w.slice(0, head)}${ell}${w.slice(w.length - tail)}`;
     if (words.length === 1 && fits(t)) return t;

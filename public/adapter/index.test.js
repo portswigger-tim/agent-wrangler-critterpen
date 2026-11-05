@@ -11,7 +11,10 @@ test('tick returns state and the events since the previous graph', () => {
   assert.deepEqual(a.tick(graph([session('x', { status: 'working' })]), NOW).events, []);
   const { state, events } = a.tick(graph([session('x', { links: [pr(3)] })]), NOW + 1000);
   assert.deepEqual(statuses(state), { x: 'finished' });
-  assert.deepEqual(events, [{ critterId: 'x', kind: 'pr', label: '#3' }, { critterId: 'x', kind: 'done' }]);
+  assert.deepEqual(events, [
+    { critterId: 'x', kind: 'pr', label: '#3' },
+    { critterId: 'x', kind: 'done' },
+  ]);
 });
 
 test('re-ticking the same graph emits nothing but lets time move status on', () => {
@@ -64,16 +67,29 @@ test('reset forgets history, so the next tick is a fresh first tick', () => {
 
 const memoryStorage = (initial = null) => {
   const box = { saved: initial, saves: 0 };
-  return { box, storage: { load: () => box.saved, save: (ids) => { box.saved = [...ids]; box.saves++; } } };
+  return {
+    box,
+    storage: {
+      load: () => box.saved,
+      save: (ids) => {
+        box.saved = [...ids];
+        box.saves++;
+      },
+    },
+  };
 };
 
 test('a finished turn stays finished across ticks and time until acknowledged', () => {
   const a = createAdapter();
   a.tick(graph([session('x', { status: 'working' })]), NOW);
   assert.deepEqual(statuses(a.tick(graph([session('x')]), NOW + 1000).state), { x: 'finished' });
-  assert.deepEqual(statuses(a.tick(graph([session('x', { lastActivity: NOW })]), NOW + 3 * ASLEEP_AFTER_MS).state), { x: 'finished' });
+  assert.deepEqual(statuses(a.tick(graph([session('x', { lastActivity: NOW })]), NOW + 3 * ASLEEP_AFTER_MS).state), {
+    x: 'finished',
+  });
   a.acknowledge('x');
-  assert.deepEqual(statuses(a.tick(graph([session('x', { lastActivity: NOW })]), NOW + 3 * ASLEEP_AFTER_MS).state), { x: 'asleep' });
+  assert.deepEqual(statuses(a.tick(graph([session('x', { lastActivity: NOW })]), NOW + 3 * ASLEEP_AFTER_MS).state), {
+    x: 'asleep',
+  });
 });
 
 test('selecting the card on the board acknowledges it, but only when the selection moves there', () => {
@@ -97,7 +113,9 @@ test('going back to work or needing the human clears finished; so does leaving t
 test('a card that went dormant as it finished is asleep, not finished', () => {
   const a = createAdapter();
   a.tick(graph([session('x', { status: 'working' })]), NOW);
-  assert.deepEqual(statuses(a.tick(graph([session('x', { dormant: true, managed: false })]), NOW + 1).state), { x: 'asleep' });
+  assert.deepEqual(statuses(a.tick(graph([session('x', { dormant: true, managed: false })]), NOW + 1).state), {
+    x: 'asleep',
+  });
 });
 
 test('finished is persisted per browser and restored on the next load', () => {
@@ -115,15 +133,30 @@ test('finished is persisted per browser and restored on the next load', () => {
 test('stored ids that are gone or busy are dropped on the first tick', () => {
   const { box, storage } = memoryStorage(['gone', 'busy', 'x']);
   const a = createAdapter({ storage });
-  assert.deepEqual(statuses(a.tick(graph([session('busy', { status: 'working' }), session('x')]), NOW).state), { busy: 'working', x: 'finished' });
+  assert.deepEqual(statuses(a.tick(graph([session('busy', { status: 'working' }), session('x')]), NOW).state), {
+    busy: 'working',
+    x: 'finished',
+  });
   assert.deepEqual(box.saved, ['x']);
 });
 
 test('broken storage reads as empty and never throws', () => {
-  const a = createAdapter({ storage: { load: () => { throw new Error('denied'); }, save: () => { throw new Error('denied'); } } });
+  const a = createAdapter({
+    storage: {
+      load: () => {
+        throw new Error('denied');
+      },
+      save: () => {
+        throw new Error('denied');
+      },
+    },
+  });
   a.tick(graph([session('x', { status: 'working' })]), NOW);
   assert.deepEqual(statuses(a.tick(graph([session('x')]), NOW + 1).state), { x: 'finished' });
-  assert.deepEqual(statuses(createAdapter({ storage: { load: () => 'nonsense' } }).tick(graph([session('x')]), NOW).state), { x: 'idle' });
+  assert.deepEqual(
+    statuses(createAdapter({ storage: { load: () => 'nonsense' } }).tick(graph([session('x')]), NOW).state),
+    { x: 'idle' },
+  );
 });
 
 test('reset forgets the graph history, not what the human has yet to see', () => {
@@ -138,7 +171,8 @@ test('reset forgets the graph history, not what the human has yet to see', () =>
 
 test('a live idle session dozes after ASLEEP_AFTER_MS quiet and only wakes on fresh activity', () => {
   const a = createAdapter();
-  const at = (minutesAgo, now) => statuses(a.tick(graph([session('x', { lastActivity: now - minutesAgo * 60_000 })]), now).state).x;
+  const at = (minutesAgo, now) =>
+    statuses(a.tick(graph([session('x', { lastActivity: now - minutesAgo * 60_000 })]), now).state).x;
   assert.equal(at(29, NOW), 'idle');
   assert.equal(at(31, NOW + 1), 'asleep');
   // lastActivity wobbling back under the threshold is not activity.
@@ -153,7 +187,7 @@ test('a missing lastActivity keeps the previous doze state rather than flickerin
   assert.deepEqual(statuses(a.tick(graph([session('x', { lastActivity: null })]), NOW + 1).state), { x: 'asleep' });
 });
 
-test('the live board\'s real shapes through the stateful adapter', async () => {
+test("the live board's real shapes through the stateful adapter", async () => {
   const live = await import('./live-board.fixture.js');
   const a = createAdapter();
   const byId = statuses(a.tick(graph(live.all), NOW).state);
@@ -167,7 +201,9 @@ test('the live board\'s real shapes through the stateful adapter', async () => {
   });
   // The job finishing hands the orchestrator back to plain idle, and the job
   // itself (a turn already over) is idle, not finished: no working → idle turn.
-  const after = statuses(a.tick(graph(live.all.map((s) => (s === live.job ? { ...s, hasBackgroundShell: false } : s))), NOW + 1000).state);
+  const after = statuses(
+    a.tick(graph(live.all.map((s) => (s === live.job ? { ...s, hasBackgroundShell: false } : s))), NOW + 1000).state,
+  );
   assert.equal(after['0069b540'], 'idle');
   assert.equal(after['69fff775'], 'idle');
 });
@@ -185,7 +221,10 @@ test('a child keeps its leash while its archived parent walks off, and loses it 
   assert.equal(parentOf(s), 'p');
   // Grace over: the parent has left PenState, so the leash goes, once.
   s = a.tick(graph([session('kid', { spawnedBy: 'p' })]), NOW + 6000).state;
-  assert.deepEqual(s.critters.map((c) => c.id), ['kid']);
+  assert.deepEqual(
+    s.critters.map((c) => c.id),
+    ['kid'],
+  );
   assert.equal(parentOf(s), undefined);
 });
 
@@ -199,7 +238,10 @@ test('a departing child keeps its leash to a parent still on the pen, and drops 
   const a = createAdapter({ archiveGraceMs: 5000 });
   a.tick(graph([session('p'), session('kid', { spawnedBy: 'p' })]), NOW);
   let s = a.tick(graph([session('p')]), NOW + 1000).state;
-  assert.deepEqual(s.critters.find((c) => c.id === 'kid'), { ...s.critters.find((c) => c.id === 'kid'), status: 'archived', parentId: 'p' });
+  assert.deepEqual(
+    s.critters.find((c) => c.id === 'kid'),
+    { ...s.critters.find((c) => c.id === 'kid'), status: 'archived', parentId: 'p' },
+  );
   s = a.tick(graph([]), NOW + 2000).state; // both now walking off: leash kept between them
   assert.equal(s.critters.find((c) => c.id === 'kid').parentId, 'p');
 });

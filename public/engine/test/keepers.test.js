@@ -1,30 +1,64 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  KEEPER_KINDS, KEEPER_NAMES, CATCH, LAND, FULL_AT, FULL_WINDOW, catchProgress, recentCatches,
-  keeperPose, keeperSpot, keeperMouth, keeperHitbox, keeperColors, drawKeeper,
+  KEEPER_KINDS,
+  KEEPER_NAMES,
+  CATCH,
+  LAND,
+  FULL_AT,
+  FULL_WINDOW,
+  catchProgress,
+  recentCatches,
+  keeperPose,
+  keeperSpot,
+  keeperMouth,
+  keeperHitbox,
+  keeperColors,
+  drawKeeper,
 } from '../buildings.js';
 import { LANDMARK_KINDS, STATUSES } from '../contract.js';
 import { resolvePalette, isDark, statusColor, rgbToHsl } from '../color.js';
 
-const palFor = (mode) => { const p = resolvePalette({}, mode); return { ...p, dark: isDark(p.bg) }; };
+const palFor = (mode) => {
+  const p = resolvePalette({}, mode);
+  return { ...p, dark: isDark(p.bg) };
+};
 const dist = (a, b) => Math.hypot(a.r - b.r, a.g - b.g, a.b - b.b);
 
 function recordingCtx() {
   let depth = 0;
   const calls = [];
   const grad = { addColorStop() {} };
-  const ctx = new Proxy({}, {
-    get(t, k) {
-      if (k in t) return t[k];
-      if (k === 'createRadialGradient' || k === 'createLinearGradient') return () => grad;
-      if (k === 'save') return () => { depth++; };
-      if (k === 'restore') return () => { depth--; };
-      return (...a) => calls.push(String(k) + '(' + a.map((v) => (typeof v === 'number' ? v.toFixed(2) : '')).join(',') + ')');
+  const ctx = new Proxy(
+    {},
+    {
+      get(t, k) {
+        if (k in t) return t[k];
+        if (k === 'createRadialGradient' || k === 'createLinearGradient') return () => grad;
+        if (k === 'save')
+          return () => {
+            depth++;
+          };
+        if (k === 'restore')
+          return () => {
+            depth--;
+          };
+        return (...a) =>
+          calls.push(`${String(k)}(${a.map((v) => (typeof v === 'number' ? v.toFixed(2) : '')).join(',')})`);
+      },
+      set(t, k, v) {
+        t[k] = v;
+        return true;
+      },
     },
-    set(t, k, v) { t[k] = v; return true; },
-  });
-  return { ctx, calls, get depth() { return depth; } };
+  );
+  return {
+    ctx,
+    calls,
+    get depth() {
+      return depth;
+    },
+  };
 }
 
 test('a keeper for every service but the phone box', () => {
@@ -42,7 +76,9 @@ test('a keeper for every service but the phone box', () => {
 
 test('the mouth (landing point) sits up on the keeper and scales linearly', () => {
   for (const k of KEEPER_KINDS) {
-    const s = keeperSpot(k), m = keeperMouth(k), h = keeperHitbox(k);
+    const s = keeperSpot(k),
+      m = keeperMouth(k),
+      h = keeperHitbox(k);
     assert.ok(m.dy < s.dy, `${k}: mouth above the keeper's feet`);
     assert.ok(Math.hypot(m.dx - h.dx, m.dy - h.dy) <= h.r, `${k}: mouth inside the hover circle`);
     const m2 = keeperMouth(k, 2);
@@ -75,7 +111,8 @@ test('pose: mouth opens before landing, chomps after, wiggles, then rests', () =
 
 test('several catches in a second make a keeper round-bellied and full', () => {
   for (const k of KEEPER_KINDS) {
-    const one = keeperPose(k, 0, { recent: 1 }), full = keeperPose(k, 0, { recent: FULL_AT });
+    const one = keeperPose(k, 0, { recent: 1 }),
+      full = keeperPose(k, 0, { recent: FULL_AT });
     assert.equal(one.full, 0);
     assert.equal(full.full, 1);
     assert.ok(full.sx > 1.1, `${k}: wider when full`);
@@ -88,8 +125,12 @@ test('reduced motion: no sway, chomp or wiggle; only the expression changes', ()
     for (const progress of [null, 0.1, LAND, 0.4, 0.8]) {
       for (const t of [0, 3.3]) {
         const p = keeperPose(k, t, { progress, recent: 1 }, true);
-        assert.equal(p.rot, 0); assert.equal(p.open, 0); assert.equal(p.dy, 0); assert.equal(p.flicker, 0);
-        assert.equal(p.sx, 1); assert.equal(p.sy, 1);
+        assert.equal(p.rot, 0);
+        assert.equal(p.open, 0);
+        assert.equal(p.dy, 0);
+        assert.equal(p.flicker, 0);
+        assert.equal(p.sx, 1);
+        assert.equal(p.sy, 1);
       }
     }
     assert.equal(keeperPose(k, 0, { progress: 0.5 }, true).eyes, 'happy');
@@ -97,7 +138,11 @@ test('reduced motion: no sway, chomp or wiggle; only the expression changes', ()
   // And it draws identically at any time.
   const pal = palFor('dark');
   for (const k of KEEPER_KINDS) {
-    const draw = (t) => { const r = recordingCtx(); drawKeeper(r.ctx, k, 50, 80, 1, pal, t, { progress: 0.6 }, { reduced: true }); return r.calls.join(';'); };
+    const draw = (t) => {
+      const r = recordingCtx();
+      drawKeeper(r.ctx, k, 50, 80, 1, pal, t, { progress: 0.6 }, { reduced: true });
+      return r.calls.join(';');
+    };
     assert.equal(draw(0), draw(12.5), k);
   }
 });
@@ -109,7 +154,8 @@ test('keepers never wear a status colour', () => {
     for (const k of KEEPER_KINDS) {
       const c = keeperColors(k, pal);
       assert.ok(rgbToHsl(c.body).s <= 0.45 + 1e-9, `${mode} ${k}: muted`);
-      for (const [s, sc] of status) assert.ok(dist(c.body, sc) >= 40, `${mode} ${k} body too close to ${s} (${dist(c.body, sc).toFixed(1)})`);
+      for (const [s, sc] of status)
+        assert.ok(dist(c.body, sc) >= 40, `${mode} ${k} body too close to ${s} (${dist(c.body, sc).toFixed(1)})`);
     }
   }
 });
@@ -134,7 +180,10 @@ test('dark themes give keepers a soft pale rim; light themes need none', async (
     assert.equal(keeperRim(k, palFor('light')), null);
     const rim = keeperRim(k, palFor('dark'));
     assert.ok(rim && rim.alpha > 0.3 && rim.blur > 0, k);
-    assert.ok(rgbToHsl(rim.color).l > rgbToHsl(keeperColors(k, palFor('dark')).body).l, `${k}: rim lighter than the body`);
+    assert.ok(
+      rgbToHsl(rim.color).l > rgbToHsl(keeperColors(k, palFor('dark')).body).l,
+      `${k}: rim lighter than the body`,
+    );
     // The rim is actually applied when drawing.
     const r = recordingCtx();
     drawKeeper(r.ctx, k, 0, 0, 1, palFor('dark'), 0);

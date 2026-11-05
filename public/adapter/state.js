@@ -90,7 +90,7 @@ export function taskIndex(graph) {
 // Sessions that belong on the pen: the same set the board draws. `offBoard`
 // cards are hosted by an extension's own view, not the board.
 export function boardSessions(graph) {
-  return (graph?.sessions || []).filter((s) => s && s.sessionId && !s.offBoard);
+  return (graph?.sessions || []).filter((s) => s?.sessionId && !s.offBoard);
 }
 
 export const parentOf = (session) => session.parentSession || session.spawnedBy || null;
@@ -156,5 +156,10 @@ export function forEngine(state, statuses) {
   if (!Array.isArray(statuses) || !statuses.length) return state;
   const known = new Set(statuses);
   if (state.critters.every((c) => known.has(c.status))) return state;
-  return { ...state, critters: state.critters.map((c) => (known.has(c.status) || !known.has(FALLBACK[c.status]) ? c : { ...c, status: FALLBACK[c.status] })) };
+  return {
+    ...state,
+    critters: state.critters.map((c) =>
+      known.has(c.status) || !known.has(FALLBACK[c.status]) ? c : { ...c, status: FALLBACK[c.status] },
+    ),
+  };
 }
