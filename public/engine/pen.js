@@ -97,7 +97,7 @@ export function createPen(el, opts = {}) {
     // Runtime randomness (blinks, smoke) gets its own stream, apart from the looks.
     const rand = rng(seed ^ 0x9e3779b9);
     return {
-      id: c.id, data: c, seed, rand, hue: tr.hue, hop: tr.hop,
+      id: c.id, data: c, seed, rand, hue: tr.hue, hopRhythm: tr.hop,
       accessory: ACCESSORIES[tr.accessory],
       ...inks(c.agent, tr.hue),
       phase: tr.phase,
@@ -657,7 +657,7 @@ export function createPen(el, opts = {}) {
       // Status-driven particles.
       const r = s.r.x;
       if (s.status === 'working') {
-        const P = 0.62 + s.hop * 0.02;
+        const P = 0.62 + s.hopRhythm * 0.02;
         const p = ((time + s.phase) / P) % 1;
         if (s.hopP < 0.75 && p >= 0.75) puff(s.cx, s.y.x, 'dust');
         s.hopP = p;
@@ -740,7 +740,7 @@ export function createPen(el, opts = {}) {
     }
     switch (status) {
       case 'working': {
-        const P = 0.62 + s.hop * 0.02;
+        const P = 0.62 + s.hopRhythm * 0.02;
         const p = (t / P) % 1;
         const drift = Math.sin(t * 0.9) * r * 0.25;
         if (p < 0.75) {
