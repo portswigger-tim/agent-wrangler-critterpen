@@ -1,0 +1,44 @@
+# Quick checks before every commit and every merge commit. Set up once per
+# clone or worktree:
+#
+#   pre-commit install        # installs both the pre-commit and pre-merge-commit hooks
+#   pre-commit run --all-files
+#
+# Revs are pinned to commit SHAs; `pre-commit autoupdate --freeze` bumps them.
+default_install_hook_types: [pre-commit, pre-merge-commit]
+default_stages: [pre-commit, pre-merge-commit, manual]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c # frozen: v6.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-json
+      - id: check-added-large-files
+        args: [--maxkb=1500]
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: 745eface02aef23e168a8afb6b5737818efbea95 # frozen: v0.11.0.1
+    hooks:
+      - id: shellcheck
+
+  - repo: local
+    hooks:
+      # The whole suite takes about a second, so it runs on any JS change. It
+      # holds the invariants: no auto-navigation, no badges, and the activity
+      # sweep's fixed label vocabulary.
+      - id: tests
+        name: npm test
+        entry: npm test
+        language: system
+        files: \.(js|json)$
+        pass_filenames: false

@@ -225,4 +225,3 @@ export function busyFraction(seed, t0, t1, ctx = {}, step = 0.1) {
   for (let t = t0; t < t1; t += step, n++) if (mind.at(t, ctx)) busy++;
   return n ? busy / n : 0;
 }
-
