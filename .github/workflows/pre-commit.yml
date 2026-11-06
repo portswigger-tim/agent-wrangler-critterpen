@@ -27,11 +27,13 @@ jobs:
       - uses: portswigger-tim/safer-runner-action@d9772c3c7c5c0f8cd6cb7123e138120b11c12371 # v2.2.1
         with:
           mode: enforce
+          # Comments go here, never inside the block below: the action reads
+          # every word in it as a domain.
+          # gitleaks is a Go hook: pre-commit builds it from module downloads.
           allowed-domains: |
             pypi.org
             files.pythonhosted.org
             registry.npmjs.org
-            # gitleaks is a Go hook: pre-commit builds it from module downloads.
             proxy.golang.org
             storage.googleapis.com
           # Read-only: installs and clones yes, publishes and pushes no. git
