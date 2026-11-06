@@ -153,9 +153,14 @@ pre-commit install
 ```
 
 Before every commit and every merge commit they run the tests, [Biome](https://biomejs.dev)
-formatting and lint (settings in `biome.json`), shellcheck and some file hygiene checks (whitespace, line endings, merge markers, large files, private keys).
+formatting and lint (settings in `biome.json`), shellcheck, [gitleaks](https://github.com/gitleaks/gitleaks) for secrets, a check for absolute paths from one machine, and some file hygiene checks (whitespace, line endings, merge markers, case clashes, large files, private keys).
 `pre-commit run --all-files` runs them by hand. CI runs the same command on every
-pull request and push to `main`.
+pull request and push to `main`, with network access limited to an allowlist by
+[safer-runner-action](https://github.com/portswigger-tim/safer-runner-action),
+which also makes every host read-only so a step can't push or publish.
+
+`main` is protected: changes land only through a pull request whose `pre-commit`
+check passes, with no force-push or deletion.
 
 ## Trademarks
 

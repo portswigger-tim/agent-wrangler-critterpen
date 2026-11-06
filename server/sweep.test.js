@@ -41,17 +41,19 @@ function fakeHost(sessions) {
 const sweepFor = () => createActivitySweep({ projectsDir: projects, realpath: async (p) => p });
 
 test("cwdSlug matches Claude Code's project folder naming", () => {
-  assert.equal(cwdSlug('/Users/a.b/.agent-wrangler/x_y'), '-Users-a-b--agent-wrangler-x-y');
+  assert.equal(cwdSlug('/srv/a.b/.agent-wrangler/x_y'), '-srv-a-b--agent-wrangler-x-y');
 });
 
-test('cwdSlug shortens long paths the way Claude Code does (observed folder names)', () => {
+// The hash suffixes match folder names observed from Claude Code, recomputed for this
+// generic path of the same length.
+test('cwdSlug shortens long paths the way Claude Code does', () => {
   const base =
-    '/private/tmp/claude-501/-Users-tim-birkett-Projects-portswigger-tim-worktrees-noindex-agent-wrangler-workshop-feat-critter-extension/157da3d0-327e-4857-ac8e-7b488535a280/scratchpad/aw-data/sessions/';
+    '/var/tmp/claude-1000/-srv-build-acme-widgets-worktrees-feat-a-long-branch-namexxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/00000000-0000-4000-8000-000000000000/scratchpad/aw-data/sessions/';
   const prefix =
-    '-private-tmp-claude-501--Users-tim-birkett-Projects-portswigger-tim-worktrees-noindex-agent-wrangler-workshop-feat-critter-extension-157da3d0-327e-4857-ac8e-7b488535a280-scratchpad-aw-data-sessions-20';
-  assert.equal(cwdSlug(`${base}20261104154405`), `${prefix}-uzxg9h`);
-  assert.equal(cwdSlug(`${base}20261104154405-17`), `${prefix}-ae37vm`);
-  assert.equal(cwdSlug(`${base}20261104154416`), `${prefix}-uzxgad`);
+    '-var-tmp-claude-1000--srv-build-acme-widgets-worktrees-feat-a-long-branch-namexxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-00000000-0000-4000-8000-000000000000-scratchpad-aw-data-sessions-20';
+  assert.equal(cwdSlug(`${base}20261104154405`), `${prefix}-h19gzn`);
+  assert.equal(cwdSlug(`${base}20261104154405-17`), `${prefix}-nkibzq`);
+  assert.equal(cwdSlug(`${base}20261104154416`), `${prefix}-h19gyr`);
 });
 
 test('watchableCards keeps Claude cards with a cwd of their own', () => {
