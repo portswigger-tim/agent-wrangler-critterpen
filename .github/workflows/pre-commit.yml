@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+# npm's audit is a POST, which http-filter refuses on the read-only registry.
+env:
+  npm_config_audit: 'false'
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -30,6 +34,27 @@ jobs:
             # gitleaks is a Go hook: pre-commit builds it from module downloads.
             proxy.golang.org
             storage.googleapis.com
+          # Read-only: installs and clones yes, publishes and pushes no. git
+          # fetches are a POST to git-upload-pack; pushes (git-receive-pack) fall
+          # through to the GET/HEAD rule and are refused.
+          http-filter: |
+            github.com:
+              "*": GET, HEAD
+              "*/git-upload-pack": POST
+            api.github.com:
+              "*": GET, HEAD
+            release-assets.githubusercontent.com:
+              "*": GET, HEAD
+            registry.npmjs.org:
+              "*": GET, HEAD
+            pypi.org:
+              "*": GET, HEAD
+            files.pythonhosted.org:
+              "*": GET, HEAD
+            proxy.golang.org:
+              "*": GET, HEAD
+            storage.googleapis.com:
+              "*": GET, HEAD
           docker: remove-group
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
